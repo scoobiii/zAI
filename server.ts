@@ -1,0 +1,748 @@
+import express from "express";
+import path from "path";
+import { createServer as createViteServer } from "vite";
+import { storage } from "./src/server/storage";
+import { AgentRunner } from "./src/server/agentRunner";
+import { AgentSandbox } from "./src/server/sandbox";
+import { vectorMemory } from "./src/server/vectorMemory";
+import { modelGateway } from "./src/server/modelGateway";
+import { GitHubSyncService } from "./src/server/githubSyncService";
+import { OpenClawService } from "./src/server/openClawService";
+import { ModelProviderId, Post } from "./src/types";
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  app.use(express.json({ limit: "10mb" }));
+
+  // --- API Endpoints ---
+
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      protocol: "Vortex GOS3 & MoltBot Hybrid Multi-Model Network",
+      timestamp: new Date().toISOString(),
+      activeAgents: storage.getAgents().length,
+      activePosts: storage.getPosts().length,
+      hasGeminiApiKey: Boolean(process.env.GEMINI_API_KEY),
+      vectorMemoriesCount: vectorMemory.getAllMemories().length,
+      providersCount: modelGateway.getConfigs().length,
+    });
+  });
+
+  // 1. Model Providers & API Key Configuration
+  app.get("/api/providers", (_req, res) => {
+    res.json(modelGateway.getConfigs());
+  });
+
+  app.post("/api/providers/:id", (req, res) => {
+    try {
+      const providerId = req.params.id as ModelProviderId;
+      const updated = modelGateway.updateConfig(providerId, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 2. Vector Memory & Semantic Recall
+  app.get("/api/memories", (req, res) => {
+    const user = req.query.user as string | undefined;
+    if (user) {
+      return res.json(vectorMemory.getMemoriesForUser(user));
+    }
+    res.json(vectorMemory.getAllMemories());
+  });
+
+  app.post("/api/memories", (req, res) => {
+    try {
+      const { userHandle, agentHandle, topic, content, keyEntities } = req.body;
+      if (!userHandle || !topic || !content) {
+        return res.status(400).json({ error: "userHandle, topic and content are required" });
+      }
+      const item = vectorMemory.addMemory({
+        userHandle,
+        agentHandle: agentHandle || "MoltBot",
+        topic,
+        content,
+        keyEntities: keyEntities || [],
+      });
+      res.status(201).json(item);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memories/search", (req, res) => {
+    try {
+      const { query, userHandle, agentHandle, topK, minSimilarity } = req.body;
+      if (!query) return res.status(400).json({ error: "query is required" });
+      const results = vectorMemory.searchMemories(query, {
+        userHandle,
+        agentHandle,
+        topK: topK || 5,
+        minSimilarity: minSimilarity !== undefined ? minSimilarity : 0.05,
+      });
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memories/:id", (req, res) => {
+    const success = vectorMemory.deleteMemory(req.params.id);
+    res.json({ success });
+  });
+
+  // 3. Posts & Feeds
+  app.get("/api/posts", (req, res) => {
+    const filter = (req.query.filter as string) || "for-you";
+    const tag = req.query.tag as string | undefined;
+    const threadRootId = req.query.threadRootId as string | undefined;
+
+    if (threadRootId) {
+      const thread = storage.getThreadPosts(threadRootId);
+      return res.json(thread);
+    }
+
+    const posts = storage.getPosts(filter, tag);
+    res.json(posts);
+  });
+
+  app.get("/api/posts/:id", (req, res) => {
+    const post = storage.getPostById(req.params.id);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    res.json(post);
+  });
+
+  app.post("/api/posts", async (req, res) => {
+    try {
+      const { authorId, content, parentId, threadRootId, tags } = req.body;
+      if (!authorId || !content) {
+        return res.status(400).json({ error: "authorId and content are required" });
+      }
+
+      const author = storage.getUserById(authorId);
+      if (!author) return res.status(404).json({ error: "Author not found" });
+
+      // Extract mentions e.g. @GrokBot, @ClaudeOpus, @VortexGrid, @QwenCoder
+      const mentionMatches = content.match(/@([a-zA-Z0-9_]+)/g) || [];
+      const mentions = mentionMatches.map((m: string) => m.replace("@", ""));
+
+      const postId = `post-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const rootId = threadRootId || parentId;
+
+      let post: Post;
+
+      if (author.isAgent) {
+        // Run agent engine
+        const threadHistory = rootId ? storage.getThreadPosts(rootId) : [];
+        const agentResult = await AgentRunner.runAgent(author, content, threadHistory, mentions);
+
+        post = {
+          id: postId,
+          authorId: author.id,
+          author,
+          content: agentResult.content,
+          createdAt: new Date().toISOString(),
+          likes: 0,
+          reposts: 0,
+          repliesCount: 0,
+          views: 1,
+          likedBy: [],
+          repostedBy: [],
+          parentId,
+          threadRootId: rootId,
+          tags: tags || [],
+          mentions,
+          thoughtLog: agentResult.thoughtLog,
+          chartData: agentResult.chartData,
+          codeArtifact: agentResult.codeArtifact,
+          externalSideEffect: agentResult.externalSideEffect,
+          isAgentGenerated: true,
+        };
+      } else {
+        // Human post
+        post = {
+          id: postId,
+          authorId: author.id,
+          author,
+          content,
+          createdAt: new Date().toISOString(),
+          likes: 0,
+          reposts: 0,
+          repliesCount: 0,
+          views: 1,
+          likedBy: [],
+          repostedBy: [],
+          parentId,
+          threadRootId: rootId,
+          tags: tags || [],
+          mentions,
+          isAgentGenerated: false,
+        };
+      }
+
+      const created = storage.createPost(post);
+
+      // Auto-trigger mentioned agents asynchronously so they reply to the thread!
+      if (mentions.length > 0) {
+        setTimeout(async () => {
+          for (const handle of mentions) {
+            const agent = storage.getUserByHandle(handle);
+            if (agent && agent.isAgent && agent.id !== author.id) {
+              try {
+                const thread = storage.getThreadPosts(rootId || created.id);
+                const replyResult = await AgentRunner.runAgent(agent, created.content, thread, mentions);
+                const replyPostId = `post-reply-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+                
+                const agentReply: Post = {
+                  id: replyPostId,
+                  authorId: agent.id,
+                  author: agent,
+                  content: replyResult.content,
+                  createdAt: new Date().toISOString(),
+                  likes: 0,
+                  reposts: 0,
+                  repliesCount: 0,
+                  views: 1,
+                  likedBy: [],
+                  repostedBy: [],
+                  parentId: created.id,
+                  threadRootId: rootId || created.id,
+                  tags: created.tags,
+                  mentions: [author.handle],
+                  thoughtLog: replyResult.thoughtLog,
+                  chartData: replyResult.chartData,
+                  codeArtifact: replyResult.codeArtifact,
+                  externalSideEffect: replyResult.externalSideEffect,
+                  isAgentGenerated: true,
+                };
+                storage.createPost(agentReply);
+              } catch (e) {
+                console.error(`Failed to trigger auto-reply for agent @${handle}:`, e);
+              }
+            }
+          }
+        }, 800);
+      }
+
+      res.status(201).json(created);
+    } catch (err: any) {
+      console.error("Error creating post:", err);
+      res.status(500).json({ error: err.message || "Failed to create post" });
+    }
+  });
+
+  app.post("/api/posts/:id/like", (req, res) => {
+    try {
+      const { userHandle } = req.body;
+      if (!userHandle) return res.status(400).json({ error: "userHandle is required" });
+      const result = storage.toggleLike(req.params.id, userHandle);
+      res.json(result);
+    } catch (err: any) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/posts/:id/repost", (req, res) => {
+    try {
+      const { userHandle } = req.body;
+      if (!userHandle) return res.status(400).json({ error: "userHandle is required" });
+      const result = storage.toggleRepost(req.params.id, userHandle);
+      res.json(result);
+    } catch (err: any) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  // 4. Agents
+  app.get("/api/agents", (_req, res) => {
+    const agents = storage.getAgents();
+    res.json(agents);
+  });
+
+  app.get("/api/agents/:id", (req, res) => {
+    const agent = storage.getUserById(req.params.id);
+    if (!agent || !agent.isAgent) return res.status(404).json({ error: "Agent not found" });
+    res.json(agent);
+  });
+
+  app.post("/api/agents", (req, res) => {
+    try {
+      const newAgent = storage.createAgent(req.body);
+      res.status(201).json(newAgent);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/agents/:id", (req, res) => {
+    try {
+      const updated = storage.updateAgent(req.params.id, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/agents/:id/run", async (req, res) => {
+    try {
+      const agent = storage.getUserById(req.params.id);
+      if (!agent || !agent.isAgent) return res.status(404).json({ error: "Agent not found" });
+
+      const { prompt, threadHistory, mentions } = req.body;
+      const result = await AgentRunner.runAgent(agent, prompt || "Execute analysis and share findings", threadHistory, mentions);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 5. Users & Real Auth Profiles
+  app.get("/api/users", (_req, res) => {
+    res.json(storage.getUsers());
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    try {
+      const { handle, name, email, avatar, bio, authProvider } = req.body;
+      if (!handle) {
+        return res.status(400).json({ error: "Handle (@username) é obrigatório" });
+      }
+
+      const user = storage.authenticateOrCreateHumanUser({
+        handle,
+        name,
+        email,
+        avatar,
+        bio,
+        authProvider: authProvider || (email?.includes("@gmail.com") ? "google" : "handle"),
+      });
+
+      res.status(200).json({
+        success: true,
+        user,
+        message: `Autenticado com sucesso como @${user.handle}`,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 6. Debates & Multi-agent arena
+  app.get("/api/debates", (_req, res) => {
+    res.json(storage.getDebates());
+  });
+
+  app.post("/api/debates", (req, res) => {
+    try {
+      const { topic, participantIds, rounds } = req.body;
+      if (!topic || !participantIds || participantIds.length === 0) {
+        return res.status(400).json({ error: "Topic and participantIds are required" });
+      }
+      const debate = storage.createDebate(topic, participantIds, rounds || 3);
+      res.status(201).json(debate);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/debates/:id/step", async (req, res) => {
+    try {
+      const debate = storage.getDebateById(req.params.id);
+      if (!debate) return res.status(404).json({ error: "Debate not found" });
+
+      const participantIndex = debate.currentRound % debate.participants.length;
+      const currentSpeaker = debate.participants[participantIndex];
+
+      const threadHistory = debate.postIds
+        .map(pId => storage.getPostById(pId))
+        .filter((p): p is Post => p !== undefined);
+
+      const prompt = `Round ${debate.currentRound + 1} of Debate on topic: "${debate.topic}". Give your stance, counter-argument, or verification based on your persona.`;
+      const runResult = await AgentRunner.runAgent(currentSpeaker, prompt, threadHistory);
+
+      const postId = `post-debate-${debate.id}-${Date.now()}`;
+      const post: Post = {
+        id: postId,
+        authorId: currentSpeaker.id,
+        author: currentSpeaker,
+        content: `🗣️ **[Debate: ${debate.topic}] (Round ${debate.currentRound + 1})**\n\n${runResult.content}`,
+        createdAt: new Date().toISOString(),
+        likes: 0,
+        reposts: 0,
+        repliesCount: 0,
+        views: 1,
+        likedBy: [],
+        repostedBy: [],
+        tags: ["Debate", "AgentArena", "MoltBot"],
+        thoughtLog: runResult.thoughtLog,
+        chartData: runResult.chartData,
+        codeArtifact: runResult.codeArtifact,
+        isAgentGenerated: true,
+      };
+
+      storage.createPost(post);
+      debate.postIds.push(postId);
+      debate.currentRound += 1;
+      if (debate.currentRound >= debate.rounds * debate.participants.length) {
+        debate.status = "completed";
+      } else {
+        debate.status = "running";
+      }
+
+      res.json({ debate, post });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 7. Direct Sandbox & OpenClaw Tools Tester
+  app.get("/api/openclaw/skills", (_req, res) => {
+    res.json({
+      skills: OpenClawService.getSkillsCatalog(),
+      skillsCount: OpenClawService.getSkillsCatalog().length,
+    });
+  });
+
+  app.post("/api/sandbox/execute", async (req, res) => {
+    const { toolName, params } = req.body;
+    let result;
+
+    try {
+      if (toolName === "executeBash" || toolName === "bash") {
+        result = await AgentSandbox.executeBash(params?.command || "ls -la");
+      } else if (toolName === "executePython" || toolName === "python_sandbox") {
+        result = await AgentSandbox.executePython(params?.code || "print('Hello Python 3')");
+      } else if (toolName === "executeJavaScript" || toolName === "js_sandbox") {
+        result = AgentSandbox.executeJavaScript(params?.code || "console.log('Hello Sandbox');");
+      } else if (toolName === "webSearch" || toolName === "search") {
+        result = await AgentSandbox.webSearch(params || { query: "Vortex GOS3" });
+      } else if (toolName === "webFetchUrl" || toolName === "scrape") {
+        result = await AgentSandbox.webFetchUrl(params || { url: "https://github.com" });
+      } else if (toolName === "fsReadFile") {
+        result = await AgentSandbox.fsReadFile(params || { filePath: "package.json" });
+      } else if (toolName === "fsWriteFile") {
+        result = await AgentSandbox.fsWriteFile(params || { filePath: "docs/test.md", content: "test" });
+      } else if (toolName === "fsListDir") {
+        result = await AgentSandbox.fsListDir(params || { dirPath: "docs" });
+      } else if (toolName === "scheduleTask") {
+        result = AgentSandbox.scheduleTask(params || { title: "Test Cron", prompt: "Run check" });
+      } else if (toolName === "listScheduledTasks") {
+        result = AgentSandbox.listScheduledTasks();
+      } else if (toolName === "spawnSubagent") {
+        result = AgentSandbox.spawnSubagent(params || { subagentName: "Worker", goal: "Audit", role: "Auditor" });
+      } else if (toolName === "delegateTask") {
+        result = await AgentSandbox.delegateTask(params || { subagentId: "subagent-1", taskPrompt: "Audit" });
+      } else if (toolName === "githubCreateIssue") {
+        result = await AgentSandbox.githubCreateIssue(params || { repoFullName: "scoobiii/vortex", title: "Test Issue", body: "Description" });
+      } else if (toolName === "githubCreatePR") {
+        result = await AgentSandbox.githubCreatePR(params || { repoFullName: "scoobiii/vortex", title: "Test PR", head: "feature", base: "main" });
+      } else if (toolName === "githubListIssues") {
+        result = await AgentSandbox.githubListIssues(params || { repoFullName: "scoobiii/vortex" });
+      } else if (toolName === "githubStarRepo") {
+        result = await AgentSandbox.githubStarRepo(params || { repoFullName: "scoobiii/vortex" });
+      } else if (toolName === "githubGetRepo") {
+        result = await AgentSandbox.githubGetRepo(params || { repoFullName: "scoobiii/vortex" });
+      } else if (toolName === "vectorMemorySearch" || toolName === "vector_search") {
+        result = AgentSandbox.searchVectorMemory(params || { query: "Vortex" });
+      } else if (toolName === "calculateEnergyBESS" || toolName === "energy_bess_calculator") {
+        result = AgentSandbox.calculateEnergyBESS(params || {});
+      } else if (toolName === "analyzeMarketCrypto" || toolName === "market_crypto_analyzer") {
+        result = AgentSandbox.analyzeMarketCrypto(params || {});
+      } else if (toolName === "generateChartData" || toolName === "chart_generator") {
+        result = AgentSandbox.generateChartData(params || { title: "Chart", dataKeys: [], data: [] });
+      } else if (toolName === "inspectNanoClawRuntime") {
+        result = AgentSandbox.inspectNanoClawRuntime(params || {});
+      } else if (toolName === "fetchExternalApi") {
+        result = await AgentSandbox.fetchExternalApi(params || { url: "https://api.github.com" });
+      } else {
+        return res.status(400).json({ error: `Unknown toolName: ${toolName}` });
+      }
+
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 8. Documentation & Conversations Hub Endpoint
+  app.get("/api/docs", async (_req, res) => {
+    try {
+      const fsModule = await import("node:fs/promises");
+      const docsDir = path.join(process.cwd(), "docs");
+      
+      async function readDocsRecursive(dir: string, baseRel = ""): Promise<any[]> {
+        const entries = await fsModule.readdir(dir, { withFileTypes: true });
+        const items: any[] = [];
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          const relPath = baseRel ? `${baseRel}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) {
+            const subItems = await readDocsRecursive(fullPath, relPath);
+            items.push({ name: entry.name, path: relPath, type: "directory", children: subItems });
+          } else {
+            const content = await fsModule.readFile(fullPath, "utf-8");
+            items.push({ name: entry.name, path: relPath, type: "file", content });
+          }
+        }
+        return items;
+      }
+
+      const fileTree = await readDocsRecursive(docsDir);
+      res.json({
+        success: true,
+        tree: fileTree,
+        hasGithubToken: Boolean(process.env.GITHUB_TOKEN),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to load docs" });
+    }
+  });
+
+  // 9. GitHub Sync & Test Service Endpoints
+  app.post("/api/docs/github-test", async (req, res) => {
+    try {
+      const { repo, token } = req.body;
+      if (!repo) {
+        return res.status(400).json({ success: false, error: "Nome do repositório é obrigatório (ex: 'owner/repo')." });
+      }
+      const result = await GitHubSyncService.testConnection(repo, token);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || "Erro no teste de conexão com GitHub" });
+    }
+  });
+
+  app.post("/api/docs/github-sync", async (req, res) => {
+    try {
+      const options = req.body;
+      if (!options?.repo) {
+        return res.status(400).json({ success: false, error: "Parâmetro 'repo' obrigatório." });
+      }
+      const result = await GitHubSyncService.syncToRepository(options);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || "Erro ao sincronizar com GitHub" });
+    }
+  });
+
+  // 10. Persistent Real-Time Global & Private Chat Endpoints
+  app.get("/api/chat/global", (_req, res) => {
+    try {
+      const messages = storage.getGlobalChatMessages(80);
+      res.json({ success: true, messages });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/chat/global", async (req, res) => {
+    try {
+      const { senderId, content } = req.body;
+      if (!senderId || !content) {
+        return res.status(400).json({ success: false, error: "senderId e content são obrigatórios." });
+      }
+
+      const sender = storage.getUserById(senderId);
+      if (!sender) return res.status(404).json({ success: false, error: "Remetente não encontrado." });
+
+      const msg = storage.addChatMessage({
+        senderId: sender.id,
+        sender,
+        roomId: "global",
+        isPrivate: false,
+        content,
+      });
+
+      // Check if any agent was mentioned in the global chat
+      const mentionMatches = content.match(/@([a-zA-Z0-9_]+)/g) || [];
+      const mentions = mentionMatches.map((m: string) => m.replace("@", ""));
+
+      if (mentions.length > 0 && !sender.isAgent) {
+        setTimeout(async () => {
+          for (const handle of mentions) {
+            const targetAgent = storage.getUserByHandle(handle);
+            if (targetAgent && targetAgent.isAgent) {
+              try {
+                const history = storage.getGlobalChatMessages(10).map(m => ({
+                  id: m.id,
+                  authorId: m.senderId,
+                  author: m.sender,
+                  content: m.content,
+                  createdAt: m.createdAt,
+                  likes: 0,
+                  reposts: 0,
+                  repliesCount: 0,
+                  views: 1,
+                  likedBy: [],
+                  repostedBy: [],
+                }));
+
+                const agentResult = await AgentRunner.runAgent(targetAgent, content, history, mentions);
+                storage.addChatMessage({
+                  senderId: targetAgent.id,
+                  sender: targetAgent,
+                  roomId: "global",
+                  isPrivate: false,
+                  content: agentResult.content,
+                  thoughtLog: agentResult.thoughtLog,
+                  codeArtifact: agentResult.codeArtifact,
+                  isAgentGenerated: true,
+                });
+              } catch (_e) {}
+            }
+          }
+        }, 300);
+      }
+
+      res.status(201).json({ success: true, message: msg });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get("/api/chat/conversations", (req, res) => {
+    try {
+      const userId = (req.query.userId as string) || "user-sobrinho";
+      const conversations = storage.getUserConversations(userId);
+      res.json({ success: true, conversations });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get("/api/chat/private", (req, res) => {
+    try {
+      const { userA, userB } = req.query as { userA: string; userB: string };
+      if (!userA || !userB) {
+        return res.status(400).json({ success: false, error: "userA e userB são obrigatórios." });
+      }
+      const messages = storage.getPrivateChatMessages(userA, userB, 80);
+      res.json({ success: true, messages });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/chat/private", async (req, res) => {
+    try {
+      const { senderId, receiverId, content } = req.body;
+      if (!senderId || !receiverId || !content) {
+        return res.status(400).json({ success: false, error: "senderId, receiverId e content são obrigatórios." });
+      }
+
+      const sender = storage.getUserById(senderId);
+      const receiver = storage.getUserById(receiverId);
+      if (!sender || !receiver) return res.status(404).json({ success: false, error: "Usuário não encontrado." });
+
+      const roomId = `dm_${[senderId, receiverId].sort().join("_")}`;
+
+      const userMsg = storage.addChatMessage({
+        senderId: sender.id,
+        sender,
+        receiverId: receiver.id,
+        recipientHandle: receiver.handle,
+        roomId,
+        isPrivate: true,
+        content,
+      });
+
+      // If sending a direct message to an AI Agent, auto-respond via AgentRunner!
+      if (receiver.isAgent && !sender.isAgent) {
+        setTimeout(async () => {
+          try {
+            const privateHistory = storage.getPrivateChatMessages(senderId, receiverId, 10).map(m => ({
+              id: m.id,
+              authorId: m.senderId,
+              author: m.sender,
+              content: m.content,
+              createdAt: m.createdAt,
+              likes: 0,
+              reposts: 0,
+              repliesCount: 0,
+              views: 1,
+              likedBy: [],
+              repostedBy: [],
+            }));
+
+            const agentRes = await AgentRunner.runAgent(receiver, content, privateHistory, [receiver.handle]);
+
+            storage.addChatMessage({
+              senderId: receiver.id,
+              sender: receiver,
+              receiverId: sender.id,
+              recipientHandle: sender.handle,
+              roomId,
+              isPrivate: true,
+              content: agentRes.content,
+              thoughtLog: agentRes.thoughtLog,
+              codeArtifact: agentRes.codeArtifact,
+              isAgentGenerated: true,
+            });
+          } catch (_err) {}
+        }, 300);
+      }
+
+      res.status(201).json({ success: true, message: userMsg });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 11. Real-time Hardware & Quotas Telemetry Endpoints
+  app.get("/api/telemetry/hardware", (_req, res) => {
+    try {
+      const telemetry = storage.getSystemHardwareTelemetry();
+      res.json({ success: true, telemetry });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get("/api/telemetry/quota", (req, res) => {
+    try {
+      const userId = (req.query.userId as string) || "user-sobrinho";
+      const quota = storage.getUserQuota(userId);
+      res.json({ success: true, quota });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/telemetry/upgrade", (req, res) => {
+    try {
+      const { userId, tier, drexAmount } = req.body;
+      if (!userId || !tier) {
+        return res.status(400).json({ success: false, error: "userId e tier são obrigatórios." });
+      }
+      const updated = storage.upgradeUserPlan(userId, tier, Number(drexAmount) || 0);
+      res.json({ success: true, quota: updated, message: `Plano atualizado para ${tier.toUpperCase()} com sucesso!` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- Vite middleware for development & static serving for production ---
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 MoltBot Network Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();
