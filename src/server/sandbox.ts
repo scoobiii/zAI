@@ -102,38 +102,6 @@ export class AgentSandbox {
   }
 
   /**
-   * GitHub Agency Tool: Real Star Action & Token Scope Audit.
-   */
-  static async githubStarRepo(params: { repoFullName: string; token?: string }): Promise<SandboxToolResult> {
-    const receipt = await ExternalGateway.starGitHubRepo(params.repoFullName, params.token);
-    return {
-      toolName: "githubStarRepo",
-      success: receipt.status === "success",
-      data: receipt.data,
-      logs: receipt.logs || [],
-      executionTimeMs: receipt.latencyMs,
-      evidenceHash: receipt.evidenceHash,
-      sideEffectReceipt: receipt,
-    };
-  }
-
-  /**
-   * GitHub Agency Tool: Real Repository Live Metadata & Star Counter.
-   */
-  static async githubGetRepo(params: { repoFullName: string; token?: string }): Promise<SandboxToolResult> {
-    const { success, data, receipt } = await ExternalGateway.getGitHubRepoDetails(params.repoFullName, params.token);
-    return {
-      toolName: "githubGetRepo",
-      success,
-      data,
-      logs: receipt.logs || [],
-      executionTimeMs: receipt.latencyMs,
-      evidenceHash: receipt.evidenceHash,
-      sideEffectReceipt: receipt,
-    };
-  }
-
-  /**
    * External Oracle: Real Audited HTTP API Request.
    */
   static async fetchExternalApi(params: {

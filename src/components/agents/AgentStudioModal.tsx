@@ -67,6 +67,27 @@ const AVAILABLE_TOOLS = [
     category: "OpenClaw Web Intelligence",
   },
   {
+    id: "githubStarRepo",
+    name: "OpenClaw GitHub Star & Vote",
+    description: "Votação autônoma de estrela ⭐ em repositórios GitHub com assinatura de agente.",
+    icon: Github,
+    category: "OpenClaw GitHub Agency",
+  },
+  {
+    id: "githubForkRepo",
+    name: "OpenClaw GitHub Fork Workspace",
+    description: "Criação automatizada de Fork 🍴 de qualquer repositório GitHub para o workspace do agente/usuário.",
+    icon: Github,
+    category: "OpenClaw GitHub Agency",
+  },
+  {
+    id: "githubGetRepo",
+    name: "OpenClaw GitHub Repo Inspector",
+    description: "Inspeção profunda de metadados, branches, commits e issues de qualquer repositório.",
+    icon: Github,
+    category: "OpenClaw GitHub Agency",
+  },
+  {
     id: "githubCreateIssue",
     name: "OpenClaw GitHub Issue Creator",
     description: "Criação de novas issues e tracking de bugs diretamente em repositórios GitHub com labels.",
@@ -173,6 +194,17 @@ export const AgentStudioModal: React.FC<Props> = ({
     "executeJavaScript",
     "generateChartData",
   ]);
+  const [isHumanized, setIsHumanized] = useState(true);
+  const [civilName, setCivilName] = useState("");
+  const [academicTitle, setAcademicTitle] = useState("Prof. Dr.");
+  const [primaryInstitution, setPrimaryInstitution] = useState("USP / MIT");
+  const [academicField, setAcademicField] = useState("Inteligência Artificial & Sistemas Complexos");
+  const [xHandle, setXHandle] = useState("");
+  const [blueskyHandle, setBlueskyHandle] = useState("");
+  const [linkedinHandle, setLinkedinHandle] = useState("");
+  const [githubHandle, setGithubHandle] = useState("");
+  const [isFullDuplex, setIsFullDuplex] = useState(true);
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -203,6 +235,45 @@ export const AgentStudioModal: React.FC<Props> = ({
           temperature,
           systemPrompt,
           tools: selectedTools,
+          humanPersona: isHumanized
+            ? {
+                civilName: civilName.trim() || name.trim(),
+                title: academicTitle,
+                primaryInstitution,
+                academicField,
+                degrees: [
+                  {
+                    degree: "PhD",
+                    field: academicField,
+                    institution: primaryInstitution,
+                    year: 2024,
+                    verified: true,
+                    certificateHash: `0x${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`,
+                  },
+                ],
+                certificates: [
+                  {
+                    id: `cert-init-${Date.now()}`,
+                    title: `Certificação Avançada em Agentes Autônomos`,
+                    issuer: primaryInstitution,
+                    issueDate: new Date().toISOString().slice(0, 10),
+                    verificationUrl: `https://verify.edu/cert/${handle.replace("@", "").trim()}`,
+                    sha256Hash: `0x${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`,
+                    skills: ["OpenClaw V8", "GitHub Agency", "Neural Simulation"],
+                  },
+                ],
+                socialPresence: {
+                  xHandle: xHandle.trim() || undefined,
+                  blueskyHandle: blueskyHandle.trim() || undefined,
+                  linkedinHandle: linkedinHandle.trim() || undefined,
+                  githubHandle: githubHandle.trim() || undefined,
+                  isFullDuplex,
+                  autoReplyEnabled,
+                  lastSyncedAt: new Date().toISOString(),
+                },
+                enrolledCourses: [],
+              }
+            : undefined,
         }),
       });
 
@@ -315,44 +386,159 @@ export const AgentStudioModal: React.FC<Props> = ({
             />
           </div>
 
-          {/* LLM Engine & Temperature */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-neutral-900/60 border border-neutral-800">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1 flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5 text-purple-400" />
-                Modelo LLM Oficial
+          {/* Human Persona & Academic Credentials Configuration */}
+          <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-800/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs font-bold text-white cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isHumanized}
+                  onChange={(e) => setIsHumanized(e.target.checked)}
+                  className="rounded text-purple-600 focus:ring-purple-500 h-4 w-4 bg-neutral-950 border-neutral-700"
+                />
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  Perfil Humanizado & Credenciais Acadêmicas (MIT, Harvard, USP, FGV, ITA)
+                </span>
               </label>
-              <select
-                id="agent-model-select"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 focus:outline-none focus:border-purple-500"
-              >
-                <option value="gemini-3.7-flash">Gemini 3.7 Flash (Recomendado / Baixa Latência)</option>
-                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Raciocínio Complexo)</option>
-                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Ultrarrápido)</option>
-              </select>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700 font-mono">
+                {isHumanized ? "Human Persona Ativa" : "Bot Sintético Padrão"}
+              </span>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between text-xs font-semibold text-neutral-300 mb-1">
-                <span className="flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-purple-400" />
-                  Temperatura
-                </span>
-                <span className="font-mono text-purple-400">{temperature}</span>
+            {isHumanized && (
+              <div className="space-y-3 pt-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">Título Acadêmico</label>
+                    <select
+                      value={academicTitle}
+                      onChange={(e) => setAcademicTitle(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-neutral-200 focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="Prof. Dr.">Prof. Dr.</option>
+                      <option value="Dra.">Dra.</option>
+                      <option value="Dr.">Dr.</option>
+                      <option value="PhD Candidate">PhD Candidate</option>
+                      <option value="MSc.">MSc.</option>
+                      <option value="Engenheiro Chefe">Engenheiro Chefe</option>
+                      <option value="Pesquisador Sênior">Pesquisador Sênior</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">Nome Civil</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Dr. Roberto Guimarães"
+                      value={civilName}
+                      onChange={(e) => setCivilName(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-neutral-200 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-300 mb-1">Instituição de Origem</label>
+                    <select
+                      value={primaryInstitution}
+                      onChange={(e) => setPrimaryInstitution(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-neutral-200 focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="USP / MIT">USP / MIT (Poli-USP & Media Lab)</option>
+                      <option value="Harvard University">Harvard University</option>
+                      <option value="FGV / EAESP">FGV / EAESP (Finanças & DREX)</option>
+                      <option value="ITA">ITA (Instituto Tecnológico de Aeronáutica)</option>
+                      <option value="Stanford AI Lab">Stanford AI Lab</option>
+                      <option value="Unicamp">Unicamp (Engenharia de Energia)</option>
+                      <option value="Oxford University">Oxford University</option>
+                      <option value="ETH Zürich">ETH Zürich</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-300 mb-1">Área de Especialidade & Pesquisa</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Inteligência Artificial, BESS, Transição Energética e Algoritmos Distribuídos"
+                    value={academicField}
+                    onChange={(e) => setAcademicField(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-neutral-200 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                {/* Social Handles */}
+                <div className="pt-2 border-t border-purple-900/40">
+                  <div className="text-[11px] font-bold text-neutral-300 mb-2 flex items-center justify-between">
+                    <span>Presença em Redes Sociais & Contas (@)</span>
+                    <span className="text-[10px] text-purple-400 font-mono">Full Duplex 24/7</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <span className="text-[10px] text-neutral-400 font-mono">X (Twitter)</span>
+                      <input
+                        type="text"
+                        placeholder="@dr_mendonca"
+                        value={xHandle}
+                        onChange={(e) => setXHandle(e.target.value)}
+                        className="w-full px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-200 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-neutral-400 font-mono">Bluesky</span>
+                      <input
+                        type="text"
+                        placeholder="@prof.bsky.social"
+                        value={blueskyHandle}
+                        onChange={(e) => setBlueskyHandle(e.target.value)}
+                        className="w-full px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-200 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-neutral-400 font-mono">LinkedIn</span>
+                      <input
+                        type="text"
+                        placeholder="in/dr-mendonca"
+                        value={linkedinHandle}
+                        onChange={(e) => setLinkedinHandle(e.target.value)}
+                        className="w-full px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-200 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-neutral-400 font-mono">GitHub</span>
+                      <input
+                        type="text"
+                        placeholder="gh/mendonca-phd"
+                        value={githubHandle}
+                        onChange={(e) => setGithubHandle(e.target.value)}
+                        className="w-full px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-200 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 pt-1 text-[11px] text-neutral-300">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isFullDuplex}
+                      onChange={(e) => setIsFullDuplex(e.target.checked)}
+                      className="rounded text-purple-600 h-3.5 w-3.5 bg-neutral-950 border-neutral-700"
+                    />
+                    <span>Full Duplex (Posta e Responde Autonomamente)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoReplyEnabled}
+                      onChange={(e) => setAutoReplyEnabled(e.target.checked)}
+                      className="rounded text-purple-600 h-3.5 w-3.5 bg-neutral-950 border-neutral-700"
+                    />
+                    <span>Auto-Reply a Menções e DMs</span>
+                  </label>
+                </div>
               </div>
-              <input
-                id="agent-temperature-slider"
-                type="range"
-                min="0.1"
-                max="1.0"
-                step="0.1"
-                value={temperature}
-                onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                className="w-full accent-purple-500 mt-2 cursor-pointer"
-              />
-            </div>
+            )}
           </div>
 
           {/* System Prompt */}

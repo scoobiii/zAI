@@ -9,6 +9,7 @@ export interface GitHubSyncOptions {
   token?: string;
   targetPath?: string;
   commitMessage?: string;
+  exportEntireProject?: boolean;
   syncConversations?: boolean;
   syncNotes?: boolean;
   syncSprints?: boolean;

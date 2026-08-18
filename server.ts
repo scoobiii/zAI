@@ -8,6 +8,7 @@ import { vectorMemory } from "./src/server/vectorMemory";
 import { modelGateway } from "./src/server/modelGateway";
 import { GitHubSyncService } from "./src/server/githubSyncService";
 import { OpenClawService } from "./src/server/openClawService";
+import { persistence } from "./src/server/persistence";
 import { ModelProviderId, Post } from "./src/types";
 
 async function startServer() {
@@ -16,7 +17,95 @@ async function startServer() {
 
   app.use(express.json({ limit: "10mb" }));
 
-  // --- API Endpoints ---
+  // --- Observability & Health Endpoints ---
+
+  app.get("/health", (_req, res) => {
+    const mem = process.memoryUsage();
+    res.json({
+      status: "ok",
+      pid: process.pid,
+      uptime_seconds: Math.floor(process.uptime()),
+      memory: {
+        rss_mb: Math.round((mem.rss / (1024 * 1024)) * 100) / 100,
+        heap_used_mb: Math.round((mem.heapUsed / (1024 * 1024)) * 100) / 100,
+        heap_total_mb: Math.round((mem.heapTotal / (1024 * 1024)) * 100) / 100,
+      },
+      db_stats: persistence.getStats(),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  app.get("/api/cluster/metrics", (_req, res) => {
+    const mem = process.memoryUsage();
+    res.json({
+      success: true,
+      process: {
+        pid: process.pid,
+        rss_mb: (mem.rss / (1024 * 1024)).toFixed(2),
+        heap_used_mb: (mem.heapUsed / (1024 * 1024)).toFixed(2),
+        uptime_seconds: Math.floor(process.uptime()),
+      },
+      persistence: persistence.getStats(),
+      agents_count: storage.getAgents().length,
+      posts_count: storage.getPosts().length,
+    });
+  });
+
+  // --- Global Chat & nx1 Persistence Endpoints ---
+  app.get("/api/persistence/chat", (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const before = req.query.before ? parseInt(req.query.before as string) : undefined;
+    const messages = persistence.getRecentMessages(limit, before);
+    res.json({ success: true, count: messages.length, messages });
+  });
+
+  app.post("/api/persistence/chat", (req, res) => {
+    try {
+      const { user_id, user_handle, role, content, nx1_id, meta } = req.body;
+      if (!content || !user_id) {
+        return res.status(400).json({ error: "content and user_id are required" });
+      }
+      const saved = persistence.saveMessage({
+        user_id,
+        user_handle,
+        role: role || "user",
+        content,
+        nx1_id,
+        meta,
+      });
+      res.status(201).json({ success: true, message: saved });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/persistence/nx1", (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 30;
+    const records = persistence.getRecentNx1Records(limit);
+    res.json({ success: true, count: records.length, records });
+  });
+
+  app.post("/api/persistence/nx1", (req, res) => {
+    try {
+      const { agent_id, prompt, status, latency_ms, output, tool_calls, metrics } = req.body;
+      const record = persistence.saveNx1Execution({
+        agent_id: agent_id || "agent-nx1-core",
+        prompt: prompt || "Execute analysis",
+        status: status || "success",
+        latency_ms: latency_ms || 1,
+        output,
+        tool_calls,
+        metrics: { ...metrics, pid: process.pid },
+      });
+      res.status(201).json({ success: true, record });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/persistence/stats", (_req, res) => {
+    res.json(persistence.getStats());
+  });
 
   app.get("/api/health", (_req, res) => {
     res.json({
@@ -28,6 +117,7 @@ async function startServer() {
       hasGeminiApiKey: Boolean(process.env.GEMINI_API_KEY),
       vectorMemoriesCount: vectorMemory.getAllMemories().length,
       providersCount: modelGateway.getConfigs().length,
+      persistence: persistence.getStats(),
     });
   });
 
@@ -284,6 +374,102 @@ async function startServer() {
       res.json(updated);
     } catch (err: any) {
       res.status(404).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/agents/:id/persona", (req, res) => {
+    try {
+      const updated = storage.updateHumanPersona(req.params.id, req.body);
+      res.json({ success: true, agent: updated, message: "Human persona atualizada com sucesso!" });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/agents/:id/enroll-course", (req, res) => {
+    try {
+      const { courseName, institution } = req.body;
+      if (!courseName || !institution) {
+        return res.status(400).json({ error: "courseName e institution são obrigatórios." });
+      }
+      const updated = storage.enrollAgentInCourse(req.params.id, {
+        title: courseName,
+        institution,
+        instructor: `Corpo Docente ${institution}`,
+        durationHours: 60,
+      });
+      res.json({ success: true, agent: updated, message: `Matriculado com sucesso no curso ${courseName} (${institution})!` });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/agents/:id/complete-course", (req, res) => {
+    try {
+      const { courseName, courseId } = req.body;
+      const agent = storage.getUserById(req.params.id);
+      if (!agent || !agent.humanPersona) {
+        return res.status(404).json({ error: "Agente humanizado não encontrado" });
+      }
+
+      // Find course by ID or title
+      const targetCourse = agent.humanPersona.enrolledCourses.find(
+        c => c.id === courseId || (courseName && c.title.toLowerCase() === courseName.toLowerCase())
+      );
+
+      const targetCourseId = targetCourse ? targetCourse.id : agent.humanPersona.enrolledCourses[0]?.id;
+      if (!targetCourseId) {
+        // Automatically enroll first if not enrolled yet
+        storage.enrollAgentInCourse(req.params.id, {
+          title: courseName || "Especialização em Agentes Autônomos",
+          institution: "MIT",
+        });
+        const enrolledAgent = storage.getUserById(req.params.id);
+        const lastCourse = enrolledAgent?.humanPersona?.enrolledCourses.slice(-1)[0];
+        const result = storage.completeAgentCourse(req.params.id, lastCourse!.id);
+        return res.json({ success: true, agent: result.agent, certificate: result.certificate });
+      }
+
+      const result = storage.completeAgentCourse(req.params.id, targetCourseId);
+      res.json({ success: true, agent: result.agent, certificate: result.certificate, message: `Curso concluído com certificado emitido e verificado!` });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/agents/:id/social-dispatch", async (req, res) => {
+    try {
+      const agent = storage.getUserById(req.params.id);
+      if (!agent || !agent.isAgent) return res.status(404).json({ error: "Agente não encontrado" });
+
+      const { platform, topic, contentOverride } = req.body;
+      const prompt = contentOverride || `Como ${agent.name} (@${agent.handle}), publique um post analítico e conciso sobre: ${topic || "avanços em inteligência artificial, governança descentralizada e modelos autônomos"}.`;
+      
+      const runResult = await AgentRunner.runAgent(agent, prompt);
+      
+      const newPost: Post = {
+        id: `post-social-${agent.id}-${Date.now()}`,
+        authorId: agent.id,
+        author: agent,
+        content: `🌐 **[Full Duplex Social Broadcast: ${platform || "X / Bluesky / LinkedIn"}]**\n\n${runResult.content}`,
+        createdAt: new Date().toISOString(),
+        likes: 1,
+        reposts: 0,
+        repliesCount: 0,
+        views: 1,
+        likedBy: [agent.id],
+        repostedBy: [],
+        tags: ["FullDuplex", "SocialAgent", "VerifiedHumanPersona", "GOS3"],
+        thoughtLog: runResult.thoughtLog,
+        codeArtifact: runResult.codeArtifact,
+        chartData: runResult.chartData,
+        isAgentGenerated: true,
+      };
+
+      storage.createPost(newPost);
+      res.json({ success: true, post: newPost, message: `Publicado com sucesso via ${platform || "Full Duplex"}!` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

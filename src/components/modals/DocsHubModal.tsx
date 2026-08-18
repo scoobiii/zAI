@@ -63,9 +63,16 @@ export const DocsHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
   const [targetBranch, setTargetBranch] = useState(GitHubDocsSyncService.getLastUsedBranch());
   const [targetPath, setTargetPath] = useState("docs");
   const [customToken, setCustomToken] = useState("");
+  const [exportEntireProject, setExportEntireProject] = useState(false);
   const [commitMessage, setCommitMessage] = useState(
     "docs(sync): sync conversation history, notes, and project sprints [GOS3]"
   );
+
+  // Star & Fork status
+  const [isStarring, setIsStarring] = useState(false);
+  const [starResult, setStarResult] = useState<string | null>(null);
+  const [isForking, setIsForking] = useState(false);
+  const [forkResult, setForkResult] = useState<string | null>(null);
 
   // Scopes
   const [syncConversations, setSyncConversations] = useState(true);
@@ -172,9 +179,10 @@ export const DocsHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
       const result = await GitHubDocsSyncService.syncDocs({
         repo: targetRepo.trim(),
         branch: targetBranch.trim() || "main",
-        targetPath: targetPath.trim() || "docs",
+        targetPath: exportEntireProject ? "" : (targetPath.trim() || "docs"),
         token: customToken.trim() || undefined,
         commitMessage: commitMessage.trim(),
+        exportEntireProject,
         syncConversations,
         syncNotes,
         syncSprints,
@@ -199,6 +207,58 @@ export const DocsHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
       });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleStarRepo = async () => {
+    if (!targetRepo.trim()) return;
+    setIsStarring(true);
+    setStarResult(null);
+    try {
+      const res = await fetch("/api/sandbox/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toolName: "githubStarRepo",
+          params: { repoFullName: targetRepo.trim() },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStarResult(`⭐ Repositório ${targetRepo} estrelado com sucesso! (Hash: ${data.evidenceHash})`);
+      } else {
+        setStarResult(`❌ Falha ao votar estrela: ${data.logs?.join(" ") || "Erro"}`);
+      }
+    } catch (err: any) {
+      setStarResult(`❌ Erro: ${err.message}`);
+    } finally {
+      setIsStarring(false);
+    }
+  };
+
+  const handleForkRepo = async () => {
+    if (!targetRepo.trim()) return;
+    setIsForking(true);
+    setForkResult(null);
+    try {
+      const res = await fetch("/api/sandbox/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toolName: "githubForkRepo",
+          params: { repoFullName: targetRepo.trim() },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setForkResult(`🍴 Fork criado com sucesso para ${data.data?.targetFork || targetRepo}! (Hash: ${data.evidenceHash})`);
+      } else {
+        setForkResult(`❌ Falha ao criar Fork: ${data.logs?.join(" ") || "Erro"}`);
+      }
+    } catch (err: any) {
+      setForkResult(`❌ Erro: ${err.message}`);
+    } finally {
+      setIsForking(false);
     }
   };
 
@@ -494,15 +554,19 @@ export const DocsHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   {/* Target Directory & Optional Token */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-neutral-300">
-                        Diretório de Destino no Repositório
+                      <label className="text-xs font-semibold text-neutral-300 flex items-center justify-between">
+                        <span>Diretório de Destino</span>
+                        {exportEntireProject && (
+                          <span className="text-[10px] text-emerald-400 font-mono">/ (Raiz do Repo)</span>
+                        )}
                       </label>
                       <input
                         type="text"
-                        placeholder="docs"
-                        value={targetPath}
+                        placeholder={exportEntireProject ? "Raiz do repositório (/)" : "docs"}
+                        disabled={exportEntireProject}
+                        value={exportEntireProject ? "" : targetPath}
                         onChange={(e) => setTargetPath(e.target.value)}
-                        className="w-full px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-xs font-mono text-white placeholder-neutral-500 focus:outline-none focus:border-purple-600"
+                        className="w-full px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-xs font-mono text-white placeholder-neutral-500 focus:outline-none focus:border-purple-600 disabled:opacity-50"
                       />
                     </div>
 
@@ -521,6 +585,37 @@ export const DocsHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                         className="w-full px-3 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-xs font-mono text-white placeholder-neutral-500 focus:outline-none focus:border-purple-600"
                       />
                     </div>
+                  </div>
+
+                  {/* Full Project Export Mode Toggle */}
+                  <div className="p-3.5 rounded-2xl bg-purple-950/30 border border-purple-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs font-bold text-white cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={exportEntireProject}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setExportEntireProject(checked);
+                            if (checked) {
+                              setCommitMessage("feat: export entire site codebase and architecture [GOS3]");
+                            } else {
+                              setCommitMessage("docs(sync): sync conversation history, notes, and project sprints [GOS3]");
+                            }
+                          }}
+                          className="rounded text-purple-600 focus:ring-purple-500 h-4 w-4 bg-neutral-950 border-neutral-700"
+                        />
+                        <span>🚀 Exportar Todo o Site / Código Completo do Repositório</span>
+                      </label>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700 font-mono">
+                        {exportEntireProject ? "Full Project Mode" : "Docs Only Mode"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-300 pl-6 leading-relaxed">
+                      {exportEntireProject
+                        ? "Transfere a estrutura completa do app (código-fonte, componentes, rotas, sandbox e documentação) para a raiz do repositório GitHub escolhido."
+                        : "Sincroniza exclusivamente o diretório /docs, relatórios e conversas estruturadas sem sobrescrever o código do projeto."}
+                    </p>
                   </div>
 
                   {/* Commit Message */}
@@ -606,19 +701,43 @@ export const DocsHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
 
                   {/* Actions & Connection Feedback */}
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
-                    <button
-                      id="btn-test-github-connection"
-                      onClick={handleTestConnection}
-                      disabled={isTestingConn || !targetRepo.trim()}
-                      className="px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700 text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isTestingConn ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-400" />
-                      ) : (
-                        <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-                      )}
-                      <span>Testar Conexão</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        id="btn-test-github-connection"
+                        onClick={handleTestConnection}
+                        disabled={isTestingConn || !targetRepo.trim()}
+                        className="px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700 text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isTestingConn ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                        ) : (
+                          <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                        )}
+                        <span>Testar Conexão</span>
+                      </button>
+
+                      <button
+                        id="btn-star-repo"
+                        onClick={handleStarRepo}
+                        disabled={isStarring || !targetRepo.trim()}
+                        className="px-3 py-2 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/80 text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                        title="Votar Estrela no Repositório com assinatura de agente/usuário"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{isStarring ? "Estrelando..." : "Votar Star ⭐"}</span>
+                      </button>
+
+                      <button
+                        id="btn-fork-repo"
+                        onClick={handleForkRepo}
+                        disabled={isForking || !targetRepo.trim()}
+                        className="px-3 py-2 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800/80 text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                        title="Criar Fork do Repositório para o Workspace do Usuário"
+                      >
+                        <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{isForking ? "Forking..." : "Fazer Fork 🍴"}</span>
+                      </button>
+                    </div>
 
                     <button
                       id="btn-execute-github-sync"
@@ -631,8 +750,38 @@ export const DocsHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                       ) : (
                         <Github className="w-4 h-4" />
                       )}
-                      <span>{isSyncing ? "Sincronizando..." : "Sincronizar com GitHub"}</span>
+                      <span>{isSyncing ? "Sincronizando..." : exportEntireProject ? "Exportar Projeto Completo" : "Sincronizar Docs com GitHub"}</span>
                     </button>
+                  </div>
+
+                  {/* Star / Fork Feedback Message */}
+                  {(starResult || forkResult) && (
+                    <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-700 text-xs font-mono text-purple-200">
+                      {starResult && <div>{starResult}</div>}
+                      {forkResult && <div className="mt-1">{forkResult}</div>}
+                    </div>
+                  )}
+
+                  {/* Google Cloud & Colab Ecosystem Connectivity Card */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-neutral-900/80 to-purple-950/40 border border-blue-800/30 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-white">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Google Ecosystem & Cloud Sandbox Runtime Conectados
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-900/50 text-blue-300 border border-blue-700 text-[10px] font-mono">
+                        OAuth Full Duplex
+                      </span>
+                    </div>
+                    <p className="text-neutral-300 text-[11px] leading-relaxed">
+                      Bots e agentes autenticados via conta Google possuem acesso nativo aos runtimes <strong>Google Cloud Sandbox</strong>, <strong>Google Colab Notebooks (CPython)</strong> e persistência em <strong>Google Drive</strong>.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="px-2 py-0.5 rounded-lg bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-300 font-mono">✓ Google Cloud Compute</span>
+                      <span className="px-2 py-0.5 rounded-lg bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-300 font-mono">✓ Colab Jupyter Kernel</span>
+                      <span className="px-2 py-0.5 rounded-lg bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-300 font-mono">✓ Drive Cloud Storage</span>
+                      <span className="px-2 py-0.5 rounded-lg bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-300 font-mono">✓ GitHub Multi-Repo Sync</span>
+                    </div>
                   </div>
 
                   {/* Connection Test Feedback Box */}
