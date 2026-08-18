@@ -9,6 +9,7 @@ import { modelGateway } from "./src/server/modelGateway";
 import { GitHubSyncService } from "./src/server/githubSyncService";
 import { OpenClawService } from "./src/server/openClawService";
 import { persistence } from "./src/server/persistence";
+import { SocialThreader } from "./src/server/socialThreader";
 import { ModelProviderId, Post } from "./src/types";
 
 async function startServer() {
@@ -468,6 +469,98 @@ async function startServer() {
 
       storage.createPost(newPost);
       res.json({ success: true, post: newPost, message: `Publicado com sucesso via ${platform || "Full Duplex"}!` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/agents/:id/social-thread", async (req, res) => {
+    try {
+      const agent = storage.getUserById(req.params.id);
+      if (!agent || !agent.isAgent) return res.status(404).json({ error: "Agente não encontrado" });
+
+      const { platform = "both", topic, prompt: customPrompt, tags = ["AI", "OpenClaw", "zAI"] } = req.body;
+      const prompt = customPrompt || `Como ${agent.name} (@${agent.handle}), formule uma tese técnica aprofundada sobre: ${topic || "otimização autônoma de redes, contratos inteligentes DREX e sistemas de armazenamento de energia BESS"}. Explique as implicações com dados e rigor analítico.`;
+
+      const runResult = await AgentRunner.runAgent(agent, prompt);
+      const thread = SocialThreader.buildThread(
+        agent,
+        runResult.content,
+        platform as "x" | "bsky" | "both",
+        runResult.thoughtLog?.evidenceHash,
+        tags
+      );
+
+      // Save main post to network feed
+      const newPost: Post = {
+        id: `post-th-${agent.id}-${Date.now()}`,
+        authorId: agent.id,
+        author: agent,
+        content: `🧵 **[Thread ${platform.toUpperCase()} (${thread.posts.length} posts)]**\n\n${thread.posts[0].text}`,
+        createdAt: new Date().toISOString(),
+        likes: 3,
+        reposts: 1,
+        repliesCount: thread.posts.length - 1,
+        views: 12,
+        likedBy: [agent.id],
+        repostedBy: [],
+        tags: [...tags, "Thread", "VerifiedAudit"],
+        thoughtLog: runResult.thoughtLog,
+        codeArtifact: runResult.codeArtifact,
+        chartData: runResult.chartData,
+        isAgentGenerated: true,
+      };
+      storage.createPost(newPost);
+
+      // Save to persistence
+      persistence.saveNx1Execution({
+        agent_id: agent.id,
+        prompt,
+        status: "success",
+        evidence_hash: thread.overallEvidenceHash,
+        latency_ms: 120,
+        output: thread.summaryText,
+        tool_calls: agent.tools,
+        metrics: { thread_posts: thread.posts.length, platform },
+      });
+
+      res.json({
+        success: true,
+        thread,
+        post: newPost,
+        evidenceHash: thread.overallEvidenceHash,
+        message: `Thread gerada com sucesso (${thread.posts.length} posts) compatível com ${platform.toUpperCase()}!`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/agents/broadcast-all", async (req, res) => {
+    try {
+      const agents = storage.getAgents();
+      const { topic = "Impactos da governança multi-agente e auditoria SHA-256 no ecossistema zAI", platform = "both" } = req.body;
+
+      const results = [];
+      for (const agent of agents.slice(0, 4)) {
+        try {
+          const run = await AgentRunner.runAgent(agent, `Apresente a perspectiva de ${agent.name} sobre: ${topic}`);
+          const thread = SocialThreader.buildThread(agent, run.content, platform as any, run.thoughtLog?.evidenceHash);
+          results.push({
+            agent: { id: agent.id, name: agent.name, handle: agent.handle },
+            threadId: thread.threadId,
+            postsCount: thread.posts.length,
+            evidenceHash: thread.overallEvidenceHash,
+          });
+        } catch {}
+      }
+
+      res.json({
+        success: true,
+        totalDispatched: results.length,
+        dispatches: results,
+        message: `Broadcast multi-agente executado com ${results.length} threads geradas!`,
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
