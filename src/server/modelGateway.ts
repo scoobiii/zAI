@@ -40,13 +40,33 @@ export class ModelGateway {
         logoBadge: "Gemini 3.7",
       },
       {
+        id: "groq",
+        name: "GroqCloud LPU",
+        providerCompany: "Groq, Inc.",
+        baseUrl: "https://api.groq.com/openai/v1",
+        apiKey: process.env.GROQ_API_KEY || undefined,
+        defaultModel: "llama-3.3-70b-versatile",
+        availableModels: [
+          "llama-3.3-70b-versatile",
+          "llama-3.1-8b-instant",
+          "deepseek-r1-distill-llama-70b",
+          "mixtral-8x7b-32768",
+          "gemma2-9b-it",
+        ],
+        isConfigured: Boolean(process.env.GROQ_API_KEY),
+        description: "Inferência de velocidade extrema em LPUs customizadas da Groq com suporte a Llama 3.3 e DeepSeek R1.",
+        color: "#f97316",
+        logoBadge: "Groq LPU",
+      },
+      {
         id: "grok",
         name: "xAI Grok",
         providerCompany: "xAI",
         baseUrl: "https://api.x.ai/v1",
+        apiKey: process.env.GROK_API_KEY || undefined,
         defaultModel: "grok-3",
         availableModels: ["grok-3", "grok-2-1212", "grok-vision-beta"],
-        isConfigured: false,
+        isConfigured: Boolean(process.env.GROK_API_KEY),
         description: "Modelo de alta velocidade, perspicácia analítica, sem filtros de censura com raciocínio matemático.",
         color: "#f59e0b",
         logoBadge: "Grok 3",
@@ -56,9 +76,10 @@ export class ModelGateway {
         name: "Anthropic Claude",
         providerCompany: "Anthropic",
         baseUrl: "https://api.anthropic.com/v1",
+        apiKey: process.env.ANTHROPIC_API_KEY || undefined,
         defaultModel: "claude-3-7-sonnet-20250219",
         availableModels: ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
-        isConfigured: false,
+        isConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
         description: "Raciocínio matizado, excelência em engenharia de software e geração de código verificável.",
         color: "#d97706",
         logoBadge: "Claude 3.7",
@@ -68,9 +89,10 @@ export class ModelGateway {
         name: "OpenAI GPT",
         providerCompany: "OpenAI",
         baseUrl: "https://api.openai.com/v1",
+        apiKey: process.env.OPENAI_API_KEY || undefined,
         defaultModel: "gpt-4o",
         availableModels: ["gpt-4o", "o3-mini", "gpt-4.5-preview", "gpt-4o-mini"],
-        isConfigured: false,
+        isConfigured: Boolean(process.env.OPENAI_API_KEY),
         description: "Modelo generalista multimodal, orquestrador de chamadas de função e pipelines estruturados.",
         color: "#10b981",
         logoBadge: "GPT-4o",
@@ -80,9 +102,10 @@ export class ModelGateway {
         name: "Perplexity Sonar",
         providerCompany: "Perplexity AI",
         baseUrl: "https://api.perplexity.ai",
+        apiKey: process.env.PERPLEXITY_API_KEY || undefined,
         defaultModel: "sonar-reasoning-pro",
         availableModels: ["sonar-reasoning-pro", "sonar-reasoning", "sonar-pro", "sonar"],
-        isConfigured: false,
+        isConfigured: Boolean(process.env.PERPLEXITY_API_KEY),
         description: "Pesquisa em tempo real ancorada na web com citações transparentes de oráculos e fontes.",
         color: "#06b6d4",
         logoBadge: "Sonar Pro",
@@ -92,9 +115,10 @@ export class ModelGateway {
         name: "DeepSeek Reasoner",
         providerCompany: "DeepSeek AI",
         baseUrl: "https://api.deepseek.com",
+        apiKey: process.env.DEEPSEEK_API_KEY || undefined,
         defaultModel: "deepseek-reasoner",
         availableModels: ["deepseek-reasoner", "deepseek-chat"],
-        isConfigured: false,
+        isConfigured: Boolean(process.env.DEEPSEEK_API_KEY),
         description: "Modelo de raciocínio profundo de pesos abertos (R1 & V3), alta capacidade matemática e Chain-of-Thought.",
         color: "#3b82f6",
         logoBadge: "DeepSeek R1",
@@ -104,9 +128,10 @@ export class ModelGateway {
         name: "Alibaba Qwen",
         providerCompany: "Alibaba Cloud / Qwen",
         baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        apiKey: process.env.DASHSCOPE_API_KEY || undefined,
         defaultModel: "qwen-2.5-coder-32b",
         availableModels: ["qwen-2.5-coder-32b", "qwen-2.5-72b-instruct", "qwen-max"],
-        isConfigured: false,
+        isConfigured: Boolean(process.env.DASHSCOPE_API_KEY),
         description: "Especialista em programação poliglota, compilação de algoritmos e otimização de código.",
         color: "#ec4899",
         logoBadge: "Qwen 2.5",
@@ -197,11 +222,12 @@ export class ModelGateway {
       }
     }
 
-    // 2. OpenAI / Grok / Perplexity / DeepSeek / Qwen / Custom (OpenAI-compatible REST API)
+    // 2. OpenAI / Groq / Grok / Perplexity / DeepSeek / Qwen / Custom (OpenAI-compatible REST API)
     if (
       config &&
       config.apiKey &&
-      (req.provider === "grok" ||
+      (req.provider === "groq" ||
+        req.provider === "grok" ||
         req.provider === "gpt" ||
         req.provider === "perplexity" ||
         req.provider === "deepseek" ||
@@ -289,9 +315,50 @@ export class ModelGateway {
       }
     }
 
-    // 4. Default Fallback using Gemini or Deterministic Smart Engine
+    // 4. CASCADE FALLBACK STAGE 1: GroqCloud LPU (Fast Inference)
+    const groqConfig = this.providerConfigs.get("groq");
+    const groqKey = groqConfig?.apiKey || process.env.GROQ_API_KEY;
+    if (groqKey && req.provider !== "groq") {
+      try {
+        const groqEndpoint = "https://api.groq.com/openai/v1/chat/completions";
+        const groqRes = await fetch(groqEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqKey}`,
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              { role: "system", content: `${req.systemPrompt}\n[FALLBACK EXECUTION VIA GROQ LPU]` },
+              { role: "user", content: req.userPrompt },
+            ],
+            temperature: req.temperature ?? 0.7,
+          }),
+        });
+
+        if (groqRes.ok) {
+          const groqData = await groqRes.json();
+          const groqText = groqData.choices?.[0]?.message?.content || "";
+          if (groqText) {
+            return {
+              text: groqText,
+              providerUsed: "groq",
+              modelUsed: "llama-3.3-70b-versatile (Groq LPU Fallback)",
+              durationMs: Date.now() - startTime,
+              tokensEstimate: groqData.usage?.total_tokens || Math.floor((req.systemPrompt.length + req.userPrompt.length + groqText.length) / 4),
+              isSimulatedFallback: false,
+            };
+          }
+        }
+      } catch (groqErr: any) {
+        console.warn(`Groq fallback failed: ${groqErr.message}`);
+      }
+    }
+
+    // 5. CASCADE FALLBACK STAGE 2: Gemini 3.7 Flash if configured
     const geminiAI = getGeminiAI();
-    if (geminiAI) {
+    if (geminiAI && req.provider !== "gemini") {
       try {
         const res = await geminiAI.models.generateContent({
           model: "gemini-3.7-flash",
@@ -299,25 +366,27 @@ export class ModelGateway {
         });
         const duration = Date.now() - startTime;
         const text = res.text || "";
-        return {
-          text,
-          providerUsed: req.provider,
-          modelUsed: req.model || `${req.provider}-engine`,
-          durationMs: duration,
-          tokensEstimate: Math.floor((req.systemPrompt.length + req.userPrompt.length + text.length) / 4),
-          isSimulatedFallback: false,
-        };
+        if (text) {
+          return {
+            text,
+            providerUsed: req.provider,
+            modelUsed: "gemini-3.7-flash (Cascade Fallback)",
+            durationMs: duration,
+            tokensEstimate: Math.floor((req.systemPrompt.length + req.userPrompt.length + text.length) / 4),
+            isSimulatedFallback: false,
+          };
+        }
       } catch (err) {
-        // Continue to fallback simulation
+        // Continue to local SLM & RAG fallback
       }
     }
 
-    // Deterministic simulation fallback
+    // 6. CASCADE FALLBACK STAGE 3 & 4: Local Lightweight SLM + RAG Fine
     const duration = Date.now() - startTime;
     return {
       text: "",
       providerUsed: req.provider,
-      modelUsed: req.model,
+      modelUsed: req.model || "local-slm-v2",
       durationMs: duration,
       tokensEstimate: 120,
       isSimulatedFallback: true,

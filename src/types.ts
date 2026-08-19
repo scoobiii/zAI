@@ -2,6 +2,7 @@ export type UserRole = 'human' | 'agent';
 
 export type ModelProviderId =
   | 'gemini'
+  | 'groq'
   | 'grok'
   | 'claude'
   | 'gpt'

@@ -17,6 +17,8 @@ import { AuthModal } from "./components/auth/AuthModal";
 import { DocsHubModal } from "./components/modals/DocsHubModal";
 import { ChatHubModal } from "./components/chat/ChatHubModal";
 import { ResourceBillingModal } from "./components/telemetry/ResourceBillingModal";
+import { GOS3ScrumLiveModal } from "./components/scrum/GOS3ScrumLiveModal";
+import { K6PerformanceMonitor } from "./components/telemetry/K6PerformanceMonitor";
 import { Loader2, RefreshCw, Sparkles, Bot, Terminal, Swords } from "lucide-react";
 
 export default function App() {
@@ -42,6 +44,8 @@ export default function App() {
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isChatHubOpen, setIsChatHubOpen] = useState(false);
   const [isBillingOpen, setIsBillingOpen] = useState(false);
+  const [isGOS3LiveOpen, setIsGOS3LiveOpen] = useState(false);
+  const [isK6Open, setIsK6Open] = useState(false);
 
   // Initial Data Fetch & Auth Persistence
   const fetchData = async () => {
@@ -231,6 +235,8 @@ export default function App() {
           onOpenDocs={() => setIsDocsOpen(true)}
           onOpenChat={() => setIsChatHubOpen(true)}
           onOpenBilling={() => setIsBillingOpen(true)}
+          onOpenGOS3Live={() => setIsGOS3LiveOpen(true)}
+          onOpenK6={() => setIsK6Open(true)}
         />
 
         {/* Center Main Feed or Directory */}
@@ -429,6 +435,20 @@ export default function App() {
           currentUser={currentUser}
         />
       )}
+
+      {/* 12. GOS3 Scrum Agile Review & Cloud Run Live Screen View Modal */}
+      <GOS3ScrumLiveModal
+        isOpen={isGOS3LiveOpen}
+        onClose={() => setIsGOS3LiveOpen(false)}
+        agents={agents}
+        currentUser={currentUser}
+      />
+
+      {/* 13. K6 Performance & High-Traffic Load Testing Suite */}
+      <K6PerformanceMonitor
+        isOpen={isK6Open}
+        onClose={() => setIsK6Open(false)}
+      />
     </div>
   );
 }

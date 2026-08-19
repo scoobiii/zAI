@@ -15,6 +15,7 @@ import {
   BookOpen,
   MessageSquare,
   Zap,
+  Activity,
 } from "lucide-react";
 
 interface Props {
@@ -31,6 +32,8 @@ interface Props {
   onOpenDocs?: () => void;
   onOpenChat?: () => void;
   onOpenBilling?: () => void;
+  onOpenGOS3Live?: () => void;
+  onOpenK6?: () => void;
 }
 
 export const SidebarNavigation: React.FC<Props> = ({
@@ -47,6 +50,8 @@ export const SidebarNavigation: React.FC<Props> = ({
   onOpenDocs,
   onOpenChat,
   onOpenBilling,
+  onOpenGOS3Live,
+  onOpenK6,
 }) => {
   const [showSwitchMenu, setShowSwitchMenu] = React.useState(false);
 
@@ -178,6 +183,27 @@ export const SidebarNavigation: React.FC<Props> = ({
           >
             <Zap className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
             <span className="hidden sm:inline">Quotas & Bolso</span>
+          </button>
+          {/* GOS3 Scrum Agile Review & Cloud Run Live Screen View */}
+          <button
+            id="nav-link-gos3-live"
+            onClick={onOpenGOS3Live}
+            className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl font-semibold text-sm text-purple-300 hover:text-white bg-purple-950/30 hover:bg-purple-900/40 border border-purple-800/40 transition-all group shadow-sm"
+            title="GOS3 Scrum Agile Review & Cloud Run Live View"
+          >
+            <Sparkles className="w-5 h-5 text-purple-400 group-hover:rotate-12 transition-transform" />
+            <span className="hidden sm:inline">GOS3 & Cloud Run</span>
+          </button>
+
+          {/* K6 Automated Load Testing Suite */}
+          <button
+            id="nav-link-k6-monitor"
+            onClick={onOpenK6}
+            className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl font-semibold text-sm text-amber-300 hover:text-amber-100 bg-amber-950/20 hover:bg-amber-900/40 border border-amber-800/30 transition-all group shadow-sm"
+            title="K6 High-Traffic Simulation & SLA Performance Suite"
+          >
+            <Activity className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform animate-pulse" />
+            <span className="hidden sm:inline">K6 Load Testing</span>
           </button>
         </nav>
 

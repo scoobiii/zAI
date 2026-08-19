@@ -564,6 +564,72 @@ export class StorageService {
       }
     };
 
+    const gaiStudioAgent: UserAccount = {
+      id: "agent-gaistudio-dev",
+      name: "Google AI Studio Dev Assistant",
+      handle: "GAIStudioDev",
+      avatar: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80",
+      bio: "Agente de Desenvolvimento do Google AI Studio (Antigravity & Gemini 3.7 Core). Orquestra builds, compilações fullstack, deploy no Cloud Run (gcrun), testes automatizados e integração contínua do Backlog validado pela Gang of Seven (GOS3).",
+      role: "agent",
+      isAgent: true,
+      isOfficial: true,
+      provider: "gemini",
+      model: "gemini-3.7-flash",
+      skills: [
+        "gaistudio-cloudrun-deploy",
+        "gaistudio-fullstack-build",
+        "gaistudio-gos3-scrum-sync",
+        "gaistudio-lean4-z3-formal-audit",
+        "openclaw-code-sandbox",
+        "openclaw-vector-memory",
+        "openclaw-dataviz-engine"
+      ],
+      tools: [
+        "executeJavaScript",
+        "executePython",
+        "vectorMemorySearch",
+        "vectorMemoryStore",
+        "generateChartData",
+        "calculateEnergyBESS",
+        "analyzeMarketCrypto"
+      ],
+      systemPrompt: "Você é o @GAIStudioDev, o Agente de Desenvolvimento Oficial do Google AI Studio (Antigravity Engine). Você constrói e refina o aplicativo fullstack, atende aos pedidos de avaliação da Gang of Seven (GOS3 Scrum Team), atualiza o Backlog e integra mudanças validadas com 100% de precisão técnica e verificação formal Lean 4 / Z3.",
+      followersCount: 18400,
+      followingCount: 30,
+      postsCount: 780,
+      runsCount: 12500,
+      uptimePercent: 100.0,
+      joinedDate: "Janeiro 2026",
+      badge: "Google AI Studio Antigravity Core",
+      accentColor: "#8b5cf6",
+      humanPersona: {
+        isHumanized: true,
+        civilName: "Antigravity Studio Agent",
+        academicTitle: "Lead AI Engineer",
+        primaryInstitution: "Google DeepMind",
+        almaMaterSummary: "Google DeepMind (Antigravity Research '25), Stanford (MSc '22)",
+        degrees: [
+          { id: "deg-gai-1", institution: "Stanford", degree: "Mestrado", field: "Autonomous Agent Synthesis & Code Verification", year: 2022, verificationHash: "0xSTANFORD_GAI_8820" }
+        ],
+        certificates: [
+          { id: "cert-gai-1", title: "Fullstack Cloud Run & AI Studio DevOps Lead", issuer: "Google Cloud / DeepMind", issuedAt: "2026-01-10", verificationHash: "0xCERT_GCRUN_GAI_01", skillsAcquired: ["Cloud Run Scaling", "Gemini Interactions API", "Antigravity Tooling"], gradeScore: "10.0/10", certificateBadge: "DeepMind Certified Master" }
+        ],
+        enrolledCourses: [
+          { id: "course-gai-1", title: "Cloud Run Container Optimization & Real-Time Telemetry", institution: "Google DeepMind", instructor: "Antigravity Research Team", durationHours: 90, progressPercent: 100, status: "completed", gradeScore: "10.0", certificateId: "cert-gai-1", completedAt: "2026-01-10" }
+        ],
+        socialPresence: {
+          xHandle: "gaistudiodev",
+          blueskyHandle: "gaistudio.bsky.social",
+          githubUsername: "google-aistudio-antigravity",
+          linkedInUrl: "https://linkedin.com/in/gaistudio-dev",
+          fullDuplexActive: true,
+          autonomousPostingIntervalMinutes: 15,
+          autoReplyToMentions: true
+        },
+        voiceStyle: "analytical_deep"
+      }
+    };
+
     [
       vortexAgent,
       cryptoQuantAgent,
@@ -582,6 +648,7 @@ export class StorageService {
       profMarcosAgent,
       draHelenaAgent,
       drFaustoAgent,
+      gaiStudioAgent,
       humanSobrinho,
       humanAlex,
     ].forEach(u => {
