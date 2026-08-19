@@ -12,6 +12,7 @@ import { persistence } from "./src/server/persistence";
 import { SocialThreader } from "./src/server/socialThreader";
 import { FormalSkillVerifier } from "./src/server/formalVerifier";
 import { K6RunnerService } from "./src/server/k6Runner";
+import { GOS3Service } from "./src/server/gos3Service";
 import { ModelProviderId, Post } from "./src/types";
 
 async function startServer() {
@@ -372,6 +373,15 @@ async function startServer() {
   });
 
   app.put("/api/agents/:id", (req, res) => {
+    try {
+      const updated = storage.updateAgent(req.params.id, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  app.patch("/api/agents/:id", (req, res) => {
     try {
       const updated = storage.updateAgent(req.params.id, req.body);
       res.json(updated);
@@ -1038,6 +1048,53 @@ async function startServer() {
   });
 
   // 13. GOS3 (Gang of Seven + PO) Scrum Agile Deliberation & Backlog Sync
+  app.get("/api/gos3/tasks", (_req, res) => {
+    try {
+      const tasks = GOS3Service.getTasks();
+      res.json({ success: true, tasks, count: tasks.length });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/gos3/tasks", (req, res) => {
+    try {
+      const { title, description, owner, reviewer, priority, storyPoints, sprintId } = req.body;
+      if (!title) return res.status(400).json({ success: false, error: "title is required" });
+      const task = GOS3Service.createTask({
+        title,
+        description,
+        owner,
+        reviewer,
+        priority,
+        storyPoints: Number(storyPoints) || 5,
+        sprintId,
+      });
+      res.status(201).json({ success: true, task });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/gos3/tasks/:id/execute", async (req, res) => {
+    try {
+      const result = await GOS3Service.executeTask(req.params.id);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch("/api/gos3/tasks/:id/status", (req, res) => {
+    try {
+      const { status } = req.body;
+      const task = GOS3Service.updateTaskStatus(req.params.id, status);
+      res.json({ success: true, task });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.post("/api/gos3/evaluate", async (req, res) => {
     try {
       const { screenUrl, requester } = req.body;
@@ -1054,33 +1111,25 @@ async function startServer() {
 - AeroMolt: "Telemetria IoT e latência de borda em 42ms."
 - PO @sobrinhoSJ: "Entregas do sprint aprovadas para integração contínua."`;
 
-      const newBacklogItems = [
-        {
-          id: `bl-${Date.now()}-1`,
-          title: "Sincronização Contínua Cloud Run + GOS3 Sprint Audit",
-          status: "completed",
-          owner: "@GAIStudioDev",
-          reviewer: "@ProfMarcos_MIT",
-          priority: "CRITICAL",
-          score: "3.0 / 3.0",
-        },
-        {
-          id: `bl-${Date.now()}-2`,
-          title: "Lean 4 Theorem Prover & Z3 SMT Mathematical Skill Matrix",
-          status: "completed",
-          owner: "@GAIStudioDev",
-          reviewer: "@DraHelena_USP",
-          priority: "HIGH",
-          score: "3.0 / 3.0",
-        },
-      ];
+      // Create new verified task in backlog
+      const createdTask = GOS3Service.createTask({
+        title: `Verificação de Sprint Cloud Run #${Date.now().toString().slice(-4)}`,
+        description: `Deliberação GOS3 com consenso unânime e validação Lean 4 / Z3.`,
+        owner: "@GAIStudioDev",
+        reviewer: "@ProfMarcos_MIT",
+        priority: "CRITICAL",
+        storyPoints: 5,
+      });
+      const execResult = await GOS3Service.executeTask(createdTask.id);
 
       res.json({
         success: true,
         score: "3.0 / 3.0",
         consensus: "UNANIMOUS_APPROVED",
         summary: deliberationSummary,
-        newBacklogItems,
+        completedTask: execResult.task,
+        evidenceHash: execResult.evidenceHash,
+        tasks: GOS3Service.getTasks(),
         timestamp: new Date().toISOString(),
       });
     } catch (err: any) {

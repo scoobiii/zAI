@@ -1744,6 +1744,44 @@ batchProcessTasks(testData).then(out => console.log(JSON.stringify(out)));`,
     this.userQuotas.set(userId, quota);
     return this.getUserQuota(userId);
   }
+
+  public updateAgent(agentId: string, updates: Partial<UserAccount>): UserAccount {
+    const existing = this.getUserById(agentId);
+    if (!existing) {
+      throw new Error(`Agente ${agentId} não encontrado.`);
+    }
+
+    const updated: UserAccount = {
+      ...existing,
+      ...updates,
+      id: existing.id, // Preserve ID
+      isAgent: true,
+      humanPersona: updates.humanPersona
+        ? {
+            ...existing.humanPersona,
+            ...updates.humanPersona,
+            socialPresence: {
+              ...existing.humanPersona?.socialPresence,
+              ...updates.humanPersona?.socialPresence,
+              fullDuplexActive: updates.humanPersona?.socialPresence?.fullDuplexActive ?? true,
+            },
+            degrees: updates.humanPersona?.degrees || existing.humanPersona?.degrees || [],
+            certificates: updates.humanPersona?.certificates || existing.humanPersona?.certificates || [],
+            enrolledCourses: updates.humanPersona?.enrolledCourses || existing.humanPersona?.enrolledCourses || [],
+          }
+        : existing.humanPersona,
+      bigTechTelemetry: updates.bigTechTelemetry
+        ? {
+            ...existing.bigTechTelemetry,
+            ...updates.bigTechTelemetry,
+            lastTrackingSyncAt: new Date().toISOString(),
+          }
+        : existing.bigTechTelemetry,
+    };
+
+    this.users.set(agentId, updated);
+    return updated;
+  }
 }
 
 export const storage = new StorageService();

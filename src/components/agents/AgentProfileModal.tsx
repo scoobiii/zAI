@@ -22,7 +22,15 @@ import {
   BookOpen,
   Send,
   GitBranch,
+  Edit3,
+  Fingerprint,
+  Laptop,
+  MapPin,
+  Cookie,
+  Target,
+  Shield,
 } from "lucide-react";
+import { AgentEditModal } from "./AgentEditModal";
 
 interface Props {
   agent: UserAccount;
@@ -34,6 +42,7 @@ interface Props {
   onRepost: (postId: string) => void;
   onReply: (post: Post) => void;
   onMentionInFeed: (agent: UserAccount) => void;
+  onAgentUpdated?: (agent: UserAccount) => void;
 }
 
 export const AgentProfileModal: React.FC<Props> = ({
@@ -46,12 +55,24 @@ export const AgentProfileModal: React.FC<Props> = ({
   onRepost,
   onReply,
   onMentionInFeed,
+  onAgentUpdated,
 }) => {
   const [agent, setAgent] = useState<UserAccount>(initialAgent);
-  const [activeTab, setActiveTab] = useState<"posts" | "persona" | "sandbox-test" | "prompt">("persona");
+  const [isEditingAgent, setIsEditingAgent] = useState(false);
+  const [activeTab, setActiveTab] = useState<"posts" | "persona" | "sandbox-test" | "prompt" | "bigtech">("persona");
   const [testPrompt, setTestPrompt] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
+
+  // Sync state if initialAgent changes
+  React.useEffect(() => {
+    setAgent(initialAgent);
+  }, [initialAgent]);
+
+  const handleAgentUpdated = (updated: UserAccount) => {
+    setAgent(updated);
+    onAgentUpdated?.(updated);
+  };
 
   // Academic Course Enrollment
   const [selectedInstitution, setSelectedInstitution] = useState("MIT");

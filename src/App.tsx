@@ -19,6 +19,8 @@ import { ChatHubModal } from "./components/chat/ChatHubModal";
 import { ResourceBillingModal } from "./components/telemetry/ResourceBillingModal";
 import { GOS3ScrumLiveModal } from "./components/scrum/GOS3ScrumLiveModal";
 import { K6PerformanceMonitor } from "./components/telemetry/K6PerformanceMonitor";
+import { FullDuplexVoiceModal } from "./components/voice/FullDuplexVoiceModal";
+import { ToastContainer } from "./components/notifications/ToastContainer";
 import { Loader2, RefreshCw, Sparkles, Bot, Terminal, Swords } from "lucide-react";
 
 export default function App() {
@@ -46,6 +48,7 @@ export default function App() {
   const [isBillingOpen, setIsBillingOpen] = useState(false);
   const [isGOS3LiveOpen, setIsGOS3LiveOpen] = useState(false);
   const [isK6Open, setIsK6Open] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
 
   // Initial Data Fetch & Auth Persistence
   const fetchData = async () => {
@@ -204,6 +207,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex justify-center font-sans antialiased selection:bg-purple-900 selection:text-white">
+      {/* Real-time Toast Notifications Hub */}
+      <ToastContainer />
+
       <div className="w-full max-w-7xl flex">
         {/* Left Sidebar Navigation */}
         <SidebarNavigation
@@ -237,6 +243,7 @@ export default function App() {
           onOpenBilling={() => setIsBillingOpen(true)}
           onOpenGOS3Live={() => setIsGOS3LiveOpen(true)}
           onOpenK6={() => setIsK6Open(true)}
+          onOpenVoice={() => setIsVoiceOpen(true)}
         />
 
         {/* Center Main Feed or Directory */}
@@ -448,6 +455,14 @@ export default function App() {
       <K6PerformanceMonitor
         isOpen={isK6Open}
         onClose={() => setIsK6Open(false)}
+      />
+
+      {/* 14. Full Duplex Voice & Barge-in Interaction Modal */}
+      <FullDuplexVoiceModal
+        isOpen={isVoiceOpen}
+        onClose={() => setIsVoiceOpen(false)}
+        agents={agents}
+        currentUser={currentUser}
       />
     </div>
   );

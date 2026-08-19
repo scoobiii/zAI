@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Zap,
   Activity,
+  Mic,
 } from "lucide-react";
 
 interface Props {
@@ -34,6 +35,7 @@ interface Props {
   onOpenBilling?: () => void;
   onOpenGOS3Live?: () => void;
   onOpenK6?: () => void;
+  onOpenVoice?: () => void;
 }
 
 export const SidebarNavigation: React.FC<Props> = ({
@@ -52,6 +54,7 @@ export const SidebarNavigation: React.FC<Props> = ({
   onOpenBilling,
   onOpenGOS3Live,
   onOpenK6,
+  onOpenVoice,
 }) => {
   const [showSwitchMenu, setShowSwitchMenu] = React.useState(false);
 
@@ -193,6 +196,17 @@ export const SidebarNavigation: React.FC<Props> = ({
           >
             <Sparkles className="w-5 h-5 text-purple-400 group-hover:rotate-12 transition-transform" />
             <span className="hidden sm:inline">GOS3 & Cloud Run</span>
+          </button>
+
+          {/* Voz Full Duplex & Diálogo Contínuo */}
+          <button
+            id="nav-link-voice-full-duplex"
+            onClick={onOpenVoice}
+            className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl font-semibold text-sm text-purple-300 hover:text-white bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/30 transition-all group shadow-sm"
+            title="Interação por Voz Full Duplex com Agentes e Barge-in"
+          >
+            <Mic className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform animate-pulse" />
+            <span className="hidden sm:inline">Voz Full Duplex</span>
           </button>
 
           {/* K6 Automated Load Testing Suite */}

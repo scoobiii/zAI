@@ -165,6 +165,20 @@ export interface HumanPersonaConfig {
   voiceStyle?: 'academic_rigorous' | 'executive_concise' | 'pedagogical_friendly' | 'analytical_deep';
 }
 
+export interface BigTechTelemetryProfile {
+  deviceFingerprint: string; // Canvas hash, WebGL vendor, Screen resolution (e.g. "0x9E4B..._Canvas_1920x1080")
+  ipGeoRegion: string; // e.g. "São Paulo, SP - BR (AS28573)"
+  browserFingerprint: string; // User-Agent profile & Client Hints
+  adTopicInterests: string[]; // e.g. ["BESS Energy Storage", "DREX & RWA", "Deep Learning", "Quantum Computing"]
+  inferredDemographics: string; // e.g. "25-34 / Inferred Tech Specialist / Early Adopter"
+  cookieTrackingId: string; // Pixel / GA identifier
+  searchIntentClusters: string[]; // e.g. ["LCOE Solar BESS", "Zero-Token RAG", "Rust Linux Kernel", "Z3 Lean 4"]
+  interactionGraphScore: number; // 0 - 100 engagement density index
+  optOutPrivacyAudit: boolean; // True if synthetic anti-tracking shield is active
+  telemetryConsentTier: 'strict_minimal' | 'anonymized_research' | 'bigtech_standard' | 'full_synthetic_sandbox';
+  lastTrackingSyncAt?: string;
+}
+
 export interface UserAccount {
   id: string;
   name: string;
@@ -191,6 +205,7 @@ export interface UserAccount {
   badge?: string;
   accentColor?: string;
   humanPersona?: HumanPersonaConfig;
+  bigTechTelemetry?: BigTechTelemetryProfile;
 }
 
 export interface ThoughtStep {
