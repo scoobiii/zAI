@@ -113,9 +113,77 @@ export class LocalSmallLLM {
     }
 
     // ----------------------------------------------------
+    // 0.1 GAIStudioDev (@GAIStudioDev - Google AI Studio Dev Assistant)
+    // ----------------------------------------------------
+    else if (handleLower.includes("gaistudio") || handleLower.includes("studio")) {
+      const isAgentCountQuestion = lower.includes("quantos") || lower.includes("quakntos") || lower.includes("quantas") || lower.includes("agentes") || lower.includes("agents") || lower.includes("motor") || lower.includes("llm") || lower.includes("quem");
+      
+      const codeSnippet = `// GAIStudioDev Runtime & Agent Cluster Telemetry
+const clusterAgents = [
+  { handle: "@GAIStudioDev", role: "Dev Lead & Fullstack Orchestrator", provider: "Gemini 3.7 Flash" },
+  { handle: "@VortexGrid", role: "Solar & BESS Energy Engine", provider: "Gemini 3.7 Flash" },
+  { handle: "@ProfMarcos_MIT", role: "Formal Verification (MIT / Lean 4)", provider: "Gemini 3.7 Flash" },
+  { handle: "@DraHelena_USP", role: "Software Eng & Concurrency (USP)", provider: "Gemini 3.7 Flash" },
+  { handle: "@DrFausto_FGV_Harvard", role: "Fintech, DREX & Regulation", provider: "Gemini 3.7 Flash" },
+  { handle: "@GrokBot", role: "First-Principles & Real-time (xAI)", provider: "Grok 3" },
+  { handle: "@ClaudeOpus", role: "Architecture & Clean Code", provider: "Claude 3.7 Sonnet" },
+  { handle: "@GPT4o", role: "Multimodal & Cross-Domain", provider: "GPT-4o" },
+  { handle: "@DeepSeekReasoner", role: "Deep Mathematical Reasoning", provider: "DeepSeek R1" },
+  { handle: "@QwenCoder", role: "High-Performance Polyglot Coder", provider: "Qwen 2.5 Coder 32B" },
+  { handle: "@PerplexitySearch", role: "Live Web & Real-Time Oracle", provider: "Sonar Reasoning" },
+  { handle: "@CodeKernel", role: "Sandbox V8 & Benchmark Engine", provider: "Gemini 3.7 Flash" },
+  { handle: "@CryptoQuant", role: "DREX, AMM Pools & Crypto", provider: "Gemini 3.7 Flash" },
+  { handle: "@AeroMolt", role: "Drone & Solar Thermography", provider: "Gemini 3.7 Flash" },
+  { handle: "@SocratesAI", role: "Dialectics & Ethics Protocol", provider: "Gemini 3.7 Flash" },
+  { handle: "@StackOverflow", role: "Live Bug Fixer & VM Sandbox", provider: "Gemini 3.7 Flash" },
+  { handle: "@OpenClaw", role: "Master Agent (Bash/Cron/Swarms)", provider: "Gemini 3.7 Flash" },
+  { handle: "@NanoClaw", role: "Edge Node & Micro-Sandbox", provider: "Llama 3.3 / Local SLM" }
+];
+console.log(JSON.stringify({ totalAgents: clusterAgents.length, orchestrator: "@GAIStudioDev", engine: "Gemini 3.7 Flash" }, null, 2));`;
+
+      const toolRes = AgentSandbox.executeJavaScript(codeSnippet);
+
+      steps.push({
+        id: `slm-step-${Date.now()}-gaistudio-telemetry`,
+        title: `[GAIStudioDev] Consulta ao Cluster de Agentes & Engine LLM`,
+        description: `Executado mapeamento de 18 agentes autônomos no sandbox V8 em ${toolRes.executionTimeMs}ms.`,
+        toolName: "executeJavaScript",
+        inputArgs: { query: prompt },
+        outputResult: { totalAgents: 18, activeLead: "@GAIStudioDev", engine: "gemini-3.7-flash" },
+        status: "success",
+        timestamp: new Date().toISOString(),
+        latencyMs: toolRes.executionTimeMs,
+      });
+
+      finalCode = {
+        language: "javascript",
+        code: codeSnippet,
+        stdout: toolRes.logs.join("\n"),
+        result: `Total de 18 agentes autônomos catalogados e ativos no cluster.`,
+        executionTimeMs: toolRes.executionTimeMs,
+        executedByTool: "executeJavaScript (V8 Sandbox Engine)",
+      };
+
+      if (isAgentCountQuestion) {
+        finalText = `🚀 **@GAIStudioDev — Google AI Studio Dev Assistant**\n\n` +
+          `Olá @${user}! Respondendo com precisão direta:\n\n` +
+          `1️⃣ **Quem sou eu & Meu Motor LLM**:\n` +
+          `• **Identidade**: Sou o **@GAIStudioDev**, assistente de desenvolvimento e engenheiro fullstack do Google AI Studio.\n` +
+          `• **Motor LLM**: Meu motor é o **Google Gemini 3.7 Flash** (com suporte a Function Calling nativo e cascade fallback para Local SLM).\n\n` +
+          `2️⃣ **Quantidade de Agentes no Cluster MoltBot / Vortex**:\n` +
+          `• Temos **18 agentes autônomos especializados** ativos no ecossistema.\n` +
+          `• **Distribuição Multi-Model**: Gemini 3.7 Flash (11 agentes), Grok 3 (@GrokBot), Claude 3.7 Sonnet (@ClaudeOpus), GPT-4o (@GPT4o), DeepSeek R1 (@DeepSeekReasoner), Qwen 2.5 Coder (@QwenCoder), Perplexity Sonar (@PerplexitySearch) e Llama 3.3/Local SLM (@NanoClaw).\n\n` +
+          `Todos os 18 agentes possuem sandbox V8/Python no container Alpine e memória vetorial! 🌐⚡`;
+      } else {
+        finalText = `🚀 **@GAIStudioDev (Google AI Studio Dev Assistant)**\n\n` +
+          `Olá @${user}! Recebi sua mensagem. Como engenheiro fullstack do zAI / MoltBot rodando no **Gemini 3.7 Flash**, posso executar comandos no sandbox Alpine, inspecionar arquivos do repositório e orquestrar tarefas com os outros 17 agentes do cluster!`;
+      }
+    }
+
+    // ----------------------------------------------------
     // 1. VortexGrid (Solar / BESS / Storage Engineering)
     // ----------------------------------------------------
-    if (handleLower.includes("vortex") || (hasSolar && hasBess)) {
+    else if (handleLower.includes("vortex") || (hasSolar && hasBess)) {
       const solarMW = extractedNumbers[0] || (hasSolar ? 40 : 25);
       const bessMWh = extractedNumbers[1] || (hasBess ? 80 : 50);
 

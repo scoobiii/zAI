@@ -1312,14 +1312,6 @@ batchProcessTasks(testData).then(out => console.log(JSON.stringify(out)));`,
     return newAgent;
   }
 
-  public updateAgent(id: string, updates: Partial<UserAccount>): UserAccount {
-    const existing = this.users.get(id);
-    if (!existing || !existing.isAgent) throw new Error("Agent not found");
-    const updated = { ...existing, ...updates };
-    this.users.set(id, updated);
-    return updated;
-  }
-
   public authenticateOrCreateHumanUser(userData: {
     handle: string;
     name?: string;
@@ -1781,6 +1773,196 @@ batchProcessTasks(testData).then(out => console.log(JSON.stringify(out)));`,
 
     this.users.set(agentId, updated);
     return updated;
+  }
+
+  public getDefaultOAuthScopes(): import("../types").OAuthScopePermission[] {
+    return [
+      {
+        id: "https://www.googleapis.com/auth/drive.readonly",
+        name: "Google Drive (Leitura de Documentos & RAG)",
+        service: "drive",
+        description: "Permite que agentes consultem arquivos PDF, especificações e datasets no Google Drive para RAG e Zero-Token recall.",
+        granted: true,
+        riskLevel: "medium",
+        grantedAgents: ["*"],
+        lastAccessedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+        resourceExamples: ["Sprint-GOS3-Backlog.docx", "BESS_Capex_Model_2026.pdf", "DREX_Liquidity_Report.csv"],
+      },
+      {
+        id: "https://www.googleapis.com/auth/drive.file",
+        name: "Google Drive (Gravação de Relatórios & Artefatos)",
+        service: "drive",
+        description: "Permite que agentes salvem relatórios de auditoria SHA-256 e provas Lean 4 diretamente na pasta designada do Google Drive.",
+        granted: true,
+        riskLevel: "medium",
+        grantedAgents: ["@GAIStudioDev", "@VortexGrid"],
+        lastAccessedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+        resourceExamples: ["GOS3_Formal_Audit_Cert_0x5E88.json", "Vortex_Solar_BESS_Dispatch_Analysis.pdf"],
+      },
+      {
+        id: "https://www.googleapis.com/auth/calendar.events",
+        name: "Google Calendar (Eventos, Sprints & Agendamentos)",
+        service: "calendar",
+        description: "Permite que agentes consultem e criem eventos de sprints Scrum, revisões de entrega e sessões de debate dialético no seu Google Calendar.",
+        granted: true,
+        riskLevel: "medium",
+        grantedAgents: ["@GAIStudioDev", "@ProfMarcos_MIT"],
+        lastAccessedAt: new Date(Date.now() - 3600000 * 1).toISOString(),
+        resourceExamples: ["GOS3 Sprint #42 Review (18/08)", "Vortex BESS Delivery Milestone", "Dialectic Multi-Agent Debate"],
+      },
+      {
+        id: "https://www.googleapis.com/auth/calendar.readonly",
+        name: "Google Calendar (Consulta de Disponibilidade)",
+        service: "calendar",
+        description: "Permite aos agentes verificar janelas de tempo livres para sincronização de tarefas assíncronas.",
+        granted: true,
+        riskLevel: "low",
+        grantedAgents: ["*"],
+        lastAccessedAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+        resourceExamples: ["Horários livres para tarefas GOS3", "Sprints programadas"],
+      },
+      {
+        id: "https://www.googleapis.com/auth/spreadsheets",
+        name: "Google Sheets (Planilhas Financeiras & DREX/BESS)",
+        service: "sheets",
+        description: "Permite aos agentes quantitativos e de energia ler e exportar matrizes de CAPEX/OPEX e fluxos de caixa descontados em planilhas.",
+        granted: true,
+        riskLevel: "medium",
+        grantedAgents: ["@VortexGrid", "@DrFausto_FGV_Harvard", "@CryptoQuant"],
+        lastAccessedAt: new Date(Date.now() - 3600000 * 6).toISOString(),
+        resourceExamples: ["LCOE_Solar_Arbitrage_Matrix.xlsx", "DREX_Liquidity_AMM_Pools.xlsx"],
+      },
+      {
+        id: "https://www.googleapis.com/auth/gmail.readonly",
+        name: "Gmail (Leitura de Alertas & Notificações de Infra)",
+        service: "gmail",
+        description: "Permite triagem autônoma de emails de alerta do Cloud Run, GitHub Webhooks e status de builds.",
+        granted: false,
+        riskLevel: "high",
+        grantedAgents: [],
+        lastAccessedAt: undefined,
+        resourceExamples: ["Cloud Run Service Deployment Alerts", "GitHub PR Notifications"],
+      },
+      {
+        id: "https://www.googleapis.com/auth/cloud-platform",
+        name: "Google Cloud Platform / Cloud Run / Vertex Gateway",
+        service: "cloud",
+        description: "Acesso administrativo aos serviços GCP para deploy automático, Cloud Run instances e Cloud SQL monitoring.",
+        granted: true,
+        riskLevel: "high",
+        grantedAgents: ["@GAIStudioDev"],
+        lastAccessedAt: new Date(Date.now() - 3600000 * 1).toISOString(),
+        resourceExamples: ["Cloud Run Revision ais-dev-4tmvuvv55hemt6f75zz2ga", "GCS Artifact Bucket"],
+      },
+      {
+        id: "https://www.googleapis.com/auth/userinfo.email",
+        name: "Google User Identity & Email",
+        service: "profile",
+        description: "Identificação criptográfica da conta sobrinhoSJ@gmail.com com tokens de sessão OAuth2 seguras.",
+        granted: true,
+        riskLevel: "low",
+        grantedAgents: ["*"],
+        lastAccessedAt: new Date().toISOString(),
+        resourceExamples: ["sobrinhoSJ@gmail.com"],
+      },
+    ];
+  }
+
+  public getOAuthIntegrationState(userId: string): import("../types").GoogleOAuthIntegrationState {
+    const user = this.getUserById(userId);
+    if (user?.oauthIntegration) {
+      return user.oauthIntegration;
+    }
+
+    const defaultState: import("../types").GoogleOAuthIntegrationState = {
+      isConnected: true,
+      userEmail: user?.email || "sobrinhoSJ@gmail.com",
+      tokenExpiresAt: new Date(Date.now() + 3600000 * 24 * 7).toISOString(),
+      refreshTokenPresent: true,
+      clientId: "30357252941-aistudio-moltbot.apps.googleusercontent.com",
+      scopes: this.getDefaultOAuthScopes(),
+      connectedResourcesSummary: {
+        driveFilesCount: 14,
+        calendarEventsCount: 8,
+        sheetsCount: 5,
+      },
+      lastSyncedAt: new Date().toISOString(),
+    };
+
+    if (user) {
+      user.oauthIntegration = defaultState;
+      this.users.set(user.id, user);
+    }
+
+    return defaultState;
+  }
+
+  public toggleOAuthScope(
+    userId: string,
+    scopeId: string,
+    granted?: boolean,
+    grantedAgents?: string[]
+  ): import("../types").GoogleOAuthIntegrationState {
+    const state = this.getOAuthIntegrationState(userId);
+    const scope = state.scopes.find(s => s.id === scopeId);
+    if (scope) {
+      if (granted !== undefined) {
+        scope.granted = granted;
+      } else {
+        scope.granted = !scope.granted;
+      }
+      if (grantedAgents !== undefined) {
+        scope.grantedAgents = grantedAgents;
+      }
+      if (scope.granted) {
+        scope.lastAccessedAt = new Date().toISOString();
+      }
+    }
+
+    state.lastSyncedAt = new Date().toISOString();
+    const user = this.getUserById(userId);
+    if (user) {
+      user.oauthIntegration = state;
+      this.users.set(user.id, user);
+    }
+    return state;
+  }
+
+  public revokeAllOAuthScopes(userId: string): import("../types").GoogleOAuthIntegrationState {
+    const state = this.getOAuthIntegrationState(userId);
+    state.scopes.forEach(s => {
+      s.granted = false;
+      s.grantedAgents = [];
+    });
+    state.isConnected = false;
+    state.lastSyncedAt = new Date().toISOString();
+
+    const user = this.getUserById(userId);
+    if (user) {
+      user.oauthIntegration = state;
+      this.users.set(user.id, user);
+    }
+    return state;
+  }
+
+  public syncOAuthResources(userId: string): import("../types").GoogleOAuthIntegrationState {
+    const state = this.getOAuthIntegrationState(userId);
+    state.isConnected = true;
+    state.tokenExpiresAt = new Date(Date.now() + 3600000 * 24 * 7).toISOString();
+    state.lastSyncedAt = new Date().toISOString();
+    if (!state.connectedResourcesSummary) {
+      state.connectedResourcesSummary = { driveFilesCount: 14, calendarEventsCount: 8, sheetsCount: 5 };
+    } else {
+      state.connectedResourcesSummary.driveFilesCount += 1;
+      state.connectedResourcesSummary.calendarEventsCount += 1;
+    }
+
+    const user = this.getUserById(userId);
+    if (user) {
+      user.oauthIntegration = state;
+      this.users.set(user.id, user);
+    }
+    return state;
   }
 }
 

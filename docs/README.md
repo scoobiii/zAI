@@ -9,6 +9,7 @@ Este diretório armazena todo o repositório documental, histórico de conversa�
 ```
 docs/
 ├── README.md                                  # Este índice geral
+├── RUNBOOK.md                                 # Runbook de Inicialização Segura e Troubleshooting (Termux/Alpine)
 ├── BACKLOG.md                                 # Backlog e status dos sprints (GOS3 v2.4)
 ├── CHANGELOG.md                               # Histórico de alterações e auditoria de testes
 ├── PLAYBOOK.md                                # Regras e convenções do time NxN (GOS3)

@@ -622,6 +622,62 @@ async function startServer() {
     }
   });
 
+  // OAuth Scopes & Google Cloud / Workspace Management
+  app.get("/api/auth/oauth-state", (req, res) => {
+    const userId = (req.query.userId as string) || "user-sobrinho";
+    const oauthState = storage.getOAuthIntegrationState(userId);
+    res.json({
+      success: true,
+      oauthState,
+    });
+  });
+
+  app.post("/api/auth/oauth-scopes/toggle", (req, res) => {
+    try {
+      const { userId = "user-sobrinho", scopeId, granted, grantedAgents } = req.body;
+      if (!scopeId) {
+        return res.status(400).json({ error: "scopeId é obrigatório" });
+      }
+
+      const updatedState = storage.toggleOAuthScope(userId, scopeId, granted, grantedAgents);
+      res.json({
+        success: true,
+        oauthState: updatedState,
+        message: `Permissão de escopo atualizada com sucesso!`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/oauth-scopes/revoke-all", (req, res) => {
+    try {
+      const { userId = "user-sobrinho" } = req.body;
+      const updatedState = storage.revokeAllOAuthScopes(userId);
+      res.json({
+        success: true,
+        oauthState: updatedState,
+        message: `Todos os escopos Google Cloud e Workspace foram revogados para os agentes.`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/google-sync", (req, res) => {
+    try {
+      const { userId = "user-sobrinho" } = req.body;
+      const updatedState = storage.syncOAuthResources(userId);
+      res.json({
+        success: true,
+        oauthState: updatedState,
+        message: `Tokens e recursos Google Cloud sincronizados com sucesso.`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // 6. Debates & Multi-agent arena
   app.get("/api/debates", (_req, res) => {
     res.json(storage.getDebates());
@@ -705,9 +761,9 @@ async function startServer() {
     try {
       if (toolName === "executeBash" || toolName === "bash") {
         result = await AgentSandbox.executeBash(params?.command || "ls -la");
-      } else if (toolName === "executePython" || toolName === "python_sandbox") {
+      } else if (toolName === "executePython" || toolName === "executePythonSim" || toolName === "python_sandbox" || toolName === "python") {
         result = await AgentSandbox.executePython(params?.code || "print('Hello Python 3')");
-      } else if (toolName === "executeJavaScript" || toolName === "js_sandbox") {
+      } else if (toolName === "executeJavaScript" || toolName === "executeTypeScript" || toolName === "js_sandbox" || toolName === "ts_sandbox" || toolName === "typescript") {
         result = AgentSandbox.executeJavaScript(params?.code || "console.log('Hello Sandbox');");
       } else if (toolName === "webSearch" || toolName === "search") {
         result = await AgentSandbox.webSearch(params || { query: "Vortex GOS3" });

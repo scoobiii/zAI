@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import vm from "vm";
+import * as esbuild from "esbuild";
 import { vectorMemory } from "./vectorMemory";
 import { ExternalGateway } from "./externalGateway";
 import { OpenClawService } from "./openClawService";
@@ -49,7 +50,20 @@ export class AgentSandbox {
         isFinite,
       };
 
-      const script = new vm.Script(code);
+      let executableCode = code;
+      try {
+        const transformed = esbuild.transformSync(code, {
+          loader: "ts",
+          target: "es2022",
+        });
+        if (transformed && transformed.code) {
+          executableCode = transformed.code;
+        }
+      } catch (transpileErr: any) {
+        // If transpilation failed, try raw code or report syntax error cleanly
+      }
+
+      const script = new vm.Script(executableCode);
       const context = vm.createContext(sandboxContext);
       result = script.runInContext(context, { timeout: timeoutMs });
     } catch (err: any) {

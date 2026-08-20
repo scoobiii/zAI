@@ -165,6 +165,33 @@ export interface HumanPersonaConfig {
   voiceStyle?: 'academic_rigorous' | 'executive_concise' | 'pedagogical_friendly' | 'analytical_deep';
 }
 
+export interface OAuthScopePermission {
+  id: string;
+  name: string;
+  service: 'drive' | 'calendar' | 'gmail' | 'sheets' | 'cloud' | 'profile';
+  description: string;
+  granted: boolean;
+  riskLevel: 'low' | 'medium' | 'high';
+  grantedAgents: string[];
+  lastAccessedAt?: string;
+  resourceExamples?: string[];
+}
+
+export interface GoogleOAuthIntegrationState {
+  isConnected: boolean;
+  userEmail: string;
+  tokenExpiresAt: string;
+  refreshTokenPresent: boolean;
+  clientId: string;
+  scopes: OAuthScopePermission[];
+  connectedResourcesSummary?: {
+    driveFilesCount: number;
+    calendarEventsCount: number;
+    sheetsCount: number;
+  };
+  lastSyncedAt?: string;
+}
+
 export interface BigTechTelemetryProfile {
   deviceFingerprint: string; // Canvas hash, WebGL vendor, Screen resolution (e.g. "0x9E4B..._Canvas_1920x1080")
   ipGeoRegion: string; // e.g. "São Paulo, SP - BR (AS28573)"
@@ -206,6 +233,7 @@ export interface UserAccount {
   accentColor?: string;
   humanPersona?: HumanPersonaConfig;
   bigTechTelemetry?: BigTechTelemetryProfile;
+  oauthIntegration?: GoogleOAuthIntegrationState;
 }
 
 export interface ThoughtStep {
