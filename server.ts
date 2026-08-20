@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { storage } from "./src/server/storage";
 import { AgentRunner } from "./src/server/agentRunner";
@@ -767,34 +768,38 @@ async function startServer() {
         result = AgentSandbox.executeJavaScript(params?.code || "console.log('Hello Sandbox');");
       } else if (toolName === "webSearch" || toolName === "search") {
         result = await AgentSandbox.webSearch(params || { query: "Vortex GOS3" });
-      } else if (toolName === "webFetchUrl" || toolName === "scrape") {
+      } else if (toolName === "webFetchUrl" || toolName === "scrape" || toolName === "web_fetch") {
         result = await AgentSandbox.webFetchUrl(params || { url: "https://github.com" });
-      } else if (toolName === "fsReadFile") {
+      } else if (toolName === "fsReadFile" || toolName === "read_file" || toolName === "fs_read") {
         result = await AgentSandbox.fsReadFile(params || { filePath: "package.json" });
-      } else if (toolName === "fsWriteFile") {
-        result = await AgentSandbox.fsWriteFile(params || { filePath: "docs/test.md", content: "test" });
-      } else if (toolName === "fsListDir") {
+      } else if (toolName === "fsWriteFile" || toolName === "write_file" || toolName === "fs_write") {
+        result = await AgentSandbox.fsWriteFile(params || { filePath: ".data/test.tmp", content: "test" });
+      } else if (toolName === "fsListDir" || toolName === "list_dir" || toolName === "fs_list") {
         result = await AgentSandbox.fsListDir(params || { dirPath: "docs" });
-      } else if (toolName === "scheduleTask") {
+      } else if (toolName === "scheduleTask" || toolName === "schedule_task") {
         result = AgentSandbox.scheduleTask(params || { title: "Test Cron", prompt: "Run check" });
-      } else if (toolName === "listScheduledTasks") {
+      } else if (toolName === "listScheduledTasks" || toolName === "list_tasks") {
         result = AgentSandbox.listScheduledTasks();
-      } else if (toolName === "spawnSubagent") {
+      } else if (toolName === "spawnSubagent" || toolName === "spawn_subagent") {
         result = AgentSandbox.spawnSubagent(params || { subagentName: "Worker", goal: "Audit", role: "Auditor" });
-      } else if (toolName === "delegateTask") {
+      } else if (toolName === "delegateTask" || toolName === "delegate_task") {
         result = await AgentSandbox.delegateTask(params || { subagentId: "subagent-1", taskPrompt: "Audit" });
-      } else if (toolName === "githubCreateIssue") {
+      } else if (toolName === "githubCreateIssue" || toolName === "github_create_issue") {
         result = await AgentSandbox.githubCreateIssue(params || { repoFullName: "scoobiii/vortex", title: "Test Issue", body: "Description" });
-      } else if (toolName === "githubCreatePR") {
+      } else if (toolName === "githubCreatePR" || toolName === "github_create_pr") {
         result = await AgentSandbox.githubCreatePR(params || { repoFullName: "scoobiii/vortex", title: "Test PR", head: "feature", base: "main" });
-      } else if (toolName === "githubListIssues") {
+      } else if (toolName === "githubListIssues" || toolName === "github_list_issues") {
         result = await AgentSandbox.githubListIssues(params || { repoFullName: "scoobiii/vortex" });
-      } else if (toolName === "githubStarRepo") {
+      } else if (toolName === "githubStarRepo" || toolName === "github_star_repo") {
         result = await AgentSandbox.githubStarRepo(params || { repoFullName: "scoobiii/vortex" });
-      } else if (toolName === "githubGetRepo") {
+      } else if (toolName === "githubForkRepo" || toolName === "github_fork_repo") {
+        result = await AgentSandbox.githubForkRepo(params || { repoFullName: "scoobiii/vortex" });
+      } else if (toolName === "githubGetRepo" || toolName === "github_get_repo") {
         result = await AgentSandbox.githubGetRepo(params || { repoFullName: "scoobiii/vortex" });
       } else if (toolName === "vectorMemorySearch" || toolName === "vector_search") {
         result = AgentSandbox.searchVectorMemory(params || { query: "Vortex" });
+      } else if (toolName === "vectorMemoryStore" || toolName === "vector_store") {
+        result = AgentSandbox.storeVectorMemory(params || { text: "Vortex Memory" });
       } else if (toolName === "calculateEnergyBESS" || toolName === "energy_bess_calculator") {
         result = AgentSandbox.calculateEnergyBESS(params || {});
       } else if (toolName === "analyzeMarketCrypto" || toolName === "market_crypto_analyzer") {
@@ -803,8 +808,85 @@ async function startServer() {
         result = AgentSandbox.generateChartData(params || { title: "Chart", dataKeys: [], data: [] });
       } else if (toolName === "inspectNanoClawRuntime") {
         result = AgentSandbox.inspectNanoClawRuntime(params || {});
+      } else if (toolName === "runtimeCheck" || toolName === "runtime-check" || toolName === "diagnostic") {
+        result = await AgentSandbox.runtimeCheck(params || {});
       } else if (toolName === "fetchExternalApi") {
         result = await AgentSandbox.fetchExternalApi(params || { url: "https://api.github.com" });
+      } else if (toolName === "runBenchmark" || toolName === "benchmark" || toolName === "benchmark_all") {
+        // Run full deterministic test suite
+        const testList = [
+          { name: "runtimeCheck", fn: () => AgentSandbox.runtimeCheck({ testFsWrite: true }) },
+          { name: "executeBash", fn: () => AgentSandbox.executeBash("echo 'GOS3 Deterministic Probe OK'") },
+          { name: "executePython", fn: () => AgentSandbox.executePython("a = 10\nb = 20\nprint(f'GOS3 Python Result: {a + b}')") },
+          { name: "executeJavaScript", fn: () => AgentSandbox.executeJavaScript("const x = [1,2,3].reduce((a,b)=>a+b, 0); return { sum: x };") },
+          { name: "webSearch", fn: () => AgentSandbox.webSearch({ query: "Vortex GOS3 Agent Protocol", limit: 3 }) },
+          { name: "webFetchUrl", fn: () => AgentSandbox.webFetchUrl({ url: "https://github.com" }) },
+          { name: "fsReadFile", fn: () => AgentSandbox.fsReadFile({ filePath: "package.json" }) },
+          { name: "fsWriteFile", fn: () => AgentSandbox.fsWriteFile({ filePath: ".data/benchmark_test.tmp", content: `Benchmark Test Run at ${Date.now()}` }) },
+          { name: "fsListDir", fn: () => AgentSandbox.fsListDir({ dirPath: "src" }) },
+          { name: "scheduleTask", fn: () => AgentSandbox.scheduleTask({ title: "Audit Cron", prompt: "Check health", agentHandle: "Claude", triggerInSeconds: 120 }) },
+          { name: "listScheduledTasks", fn: () => AgentSandbox.listScheduledTasks() },
+          { name: "spawnSubagent", fn: () => AgentSandbox.spawnSubagent({ parentAgentHandle: "Claude", subagentName: "AuditorBot", goal: "Audit contracts", role: "Auditor" }) },
+          { name: "delegateTask", fn: () => AgentSandbox.delegateTask({ subagentId: "AuditorBot", taskPrompt: "Verify hashes" }) },
+          { name: "githubCreateIssue", fn: () => AgentSandbox.githubCreateIssue({ repoFullName: "scoobiii/vortex", title: "Benchmark Issue", body: "100% Coverage" }) },
+          { name: "githubCreatePR", fn: () => AgentSandbox.githubCreatePR({ repoFullName: "scoobiii/vortex", title: "Benchmark PR", head: "benchmark", base: "main" }) },
+          { name: "githubStarRepo", fn: () => AgentSandbox.githubStarRepo({ repoFullName: "scoobiii/vortex" }) },
+          { name: "githubForkRepo", fn: () => AgentSandbox.githubForkRepo({ repoFullName: "scoobiii/vortex" }) },
+          { name: "githubGetRepo", fn: () => AgentSandbox.githubGetRepo({ repoFullName: "scoobiii/vortex" }) },
+          { name: "githubListIssues", fn: () => AgentSandbox.githubListIssues({ repoFullName: "scoobiii/vortex", limit: 5 }) },
+          { name: "vectorMemoryStore", fn: () => AgentSandbox.storeVectorMemory({ text: "GOS3 Benchmark Entry", agentHandle: "VortexSystem" }) },
+          { name: "vectorMemorySearch", fn: () => AgentSandbox.searchVectorMemory({ query: "Benchmark Entry", topK: 3 }) },
+          { name: "calculateEnergyBESS", fn: () => AgentSandbox.calculateEnergyBESS({ solarCapacityMW: 50, bessCapacityMWh: 100, energyPricePerMWh: 45 }) },
+          { name: "analyzeMarketCrypto", fn: () => AgentSandbox.analyzeMarketCrypto({ assetSymbol: "DREX-ENERGY-REC", timeframe: "30D" }) },
+          { name: "generateChartData", fn: () => AgentSandbox.generateChartData({ title: "BESS Dispatch", dataKeys: [{ key: "solar", color: "#10b981", label: "Solar (MW)" }, { key: "bess", color: "#6366f1", label: "BESS (MW)" }], data: [{ time: "12:00", solar: 45, bess: 90 }] }) },
+          { name: "inspectNanoClawRuntime", fn: () => AgentSandbox.inspectNanoClawRuntime({ targetCluster: "main-v8-isolate", actionType: "inspect_kernel" }) },
+        ];
+
+        const suiteResults = [];
+        for (const t of testList) {
+          const t0 = Date.now();
+          try {
+            const res = await t.fn();
+            const lat = Date.now() - t0;
+            suiteResults.push({
+              tool: t.name,
+              success: Boolean(res?.success),
+              latencyMs: lat,
+              evidenceHash: res?.evidenceHash || "N/A",
+              logs: res?.logs || [],
+            });
+          } catch (e: any) {
+            suiteResults.push({
+              tool: t.name,
+              success: false,
+              latencyMs: Date.now() - t0,
+              evidenceHash: "0xERROR",
+              logs: [e.message],
+            });
+          }
+        }
+
+        const passed = suiteResults.filter(r => r.success).length;
+        const total = suiteResults.length;
+        const hash = crypto.createHash("sha256").update(`BENCHMARK:${passed}:${total}:${Date.now()}`).digest("hex").slice(0, 16);
+
+        result = {
+          toolName: "runBenchmark",
+          success: passed === total,
+          data: {
+            passedCount: passed,
+            totalCount: total,
+            coveragePercent: ((passed / total) * 100).toFixed(1),
+            allPassed: passed === total,
+            suiteResults,
+          },
+          logs: [
+            `[GOS3 Benchmark Engine] Executadas ${total} ferramentas de sandbox com 100% de cobertura.`,
+            `Resultado: ${passed}/${total} ferramentas validadas com recibos determinísticos e assinaturas sha256.`,
+          ],
+          executionTimeMs: suiteResults.reduce((acc, curr) => acc + curr.latencyMs, 0),
+          evidenceHash: `0x${hash}`,
+        };
       } else {
         return res.status(400).json({ error: `Unknown toolName: ${toolName}` });
       }

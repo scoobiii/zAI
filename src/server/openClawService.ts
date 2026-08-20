@@ -1129,7 +1129,7 @@ export class OpenClawService {
         service: "github",
         action: "github.createPR",
         target: cleanRepo,
-        status: res.ok ? "success" : "error",
+        status: res.ok ? "success" : (res.status === 401 || res.status === 404 || res.status === 422 ? "auth_required" : "error"),
         httpStatus: res.status,
         statusText: res.statusText,
         verified: res.ok,

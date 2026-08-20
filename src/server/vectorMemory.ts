@@ -126,26 +126,31 @@ export class VectorMemoryEngine {
    */
   public addMemory(data: {
     userId?: string;
-    userHandle: string;
+    userHandle?: string;
     agentId?: string;
-    agentHandle: string;
-    topic: string;
+    agentHandle?: string;
+    topic?: string;
     content: string;
     keyEntities?: string[];
     sourcePostId?: string;
   }): VectorMemoryItem {
     const id = `mem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const embedding = this.generateLocalEmbedding(`${data.topic} ${data.content} ${(data.keyEntities || []).join(" ")}`);
+    const userHandle = (data.userHandle || "SystemUser").replace("@", "");
+    const agentHandle = (data.agentHandle || "SystemAgent").replace("@", "");
+    const topic = data.topic || "GOS3 Context";
+    const content = data.content || "";
+
+    const embedding = this.generateLocalEmbedding(`${topic} ${content} ${(data.keyEntities || []).join(" ")}`);
 
     const nowIso = new Date().toISOString();
     const item: VectorMemoryItem = {
       id,
       userId: data.userId,
-      userHandle: data.userHandle.replace("@", ""),
+      userHandle,
       agentId: data.agentId,
-      agentHandle: data.agentHandle.replace("@", ""),
-      topic: data.topic,
-      content: data.content,
+      agentHandle,
+      topic,
+      content,
       keyEntities: data.keyEntities || [],
       embeddingDimension: embedding.length,
       embedding,
@@ -160,10 +165,10 @@ export class VectorMemoryEngine {
 
   public storeMemory(data: {
     userId?: string;
-    userHandle: string;
+    userHandle?: string;
     agentId?: string;
-    agentHandle: string;
-    topic: string;
+    agentHandle?: string;
+    topic?: string;
     content: string;
     keyEntities?: string[];
     sourcePostId?: string;
