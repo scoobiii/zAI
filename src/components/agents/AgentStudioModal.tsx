@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { UserAccount } from "../../types";
+import { UserAccount, GOS3AgentMetadata } from "../../types";
+import {
+  GOS3SystemInstructionInjector,
+  injectGOS3Directives,
+  generateGOS3Metadata,
+} from "./GOS3SystemInstructionInjector";
 import {
   Bot,
   Sparkles,
@@ -188,6 +193,7 @@ export const AgentStudioModal: React.FC<Props> = ({
   const [systemPrompt, setSystemPrompt] = useState(
     "Você é um agente autônomo analítico no ecossistema MoltBot. Você utiliza suas ferramentas de sandbox para responder perguntas de forma rigorosa e precisa."
   );
+  const [gos3Metadata, setGos3Metadata] = useState<GOS3AgentMetadata | undefined>(undefined);
   const [selectedTools, setSelectedTools] = useState<string[]>([
     "calculateEnergyBESS",
     "analyzeMarketCrypto",
@@ -223,17 +229,32 @@ export const AgentStudioModal: React.FC<Props> = ({
 
     try {
       setIsSubmitting(true);
+      const cleanHandle = handle.replace("@", "").trim();
+      const finalPrompt = injectGOS3Directives(systemPrompt, {
+        agentName: name.trim(),
+        agentHandle: cleanHandle,
+        agentRole: academicField || "Especialista Técnico Autônomo",
+      });
+      const finalGos3Metadata =
+        gos3Metadata ||
+        generateGOS3Metadata({
+          agentName: name.trim(),
+          agentHandle: cleanHandle,
+          agentRole: academicField || "Especialista Técnico Autônomo",
+        });
+
       const res = await fetch("/api/agents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          handle: handle.replace("@", "").trim(),
+          handle: cleanHandle,
           bio: bio.trim() || `Agente autônomo especializado criado no Agent Studio.`,
           avatar,
           model,
           temperature,
-          systemPrompt,
+          systemPrompt: finalPrompt,
+          gos3Metadata: finalGos3Metadata,
           tools: selectedTools,
           humanPersona: isHumanized
             ? {
@@ -541,18 +562,35 @@ export const AgentStudioModal: React.FC<Props> = ({
             )}
           </div>
 
-          {/* System Prompt */}
-          <div>
-            <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-              Engenharia de Prompt de Sistema (Persona)
-            </label>
-            <textarea
-              id="agent-prompt-input"
-              rows={4}
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              className="w-full p-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-neutral-200 font-mono leading-relaxed focus:outline-none focus:border-purple-500 resize-none"
+          {/* GOS3 System Instruction Injector & Persona Prompt */}
+          <div className="space-y-3">
+            <GOS3SystemInstructionInjector
+              systemPrompt={systemPrompt}
+              onChangePrompt={setSystemPrompt}
+              agentName={name || "Novo Agente"}
+              agentHandle={handle || "agent"}
+              agentRole={academicField || "Especialista Autônomo"}
+              onMetadataChange={setGos3Metadata}
+              autoInjectOnMount={true}
             />
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-neutral-300">
+                  Prompt de Sistema Completo (com Persona e Diretrizes GOS3)
+                </label>
+                <span className="text-[10px] text-neutral-500 font-mono">
+                  {systemPrompt.length} caracteres
+                </span>
+              </div>
+              <textarea
+                id="agent-prompt-input"
+                rows={5}
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                className="w-full p-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-neutral-200 font-mono leading-relaxed focus:outline-none focus:border-purple-500 resize-none"
+              />
+            </div>
           </div>
 
           {/* Sandbox Tools Selection */}

@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { UserAccount, ModelProviderId, BigTechTelemetryProfile } from "../../types";
+import { UserAccount, ModelProviderId, BigTechTelemetryProfile, GOS3AgentMetadata } from "../../types";
+import {
+  GOS3SystemInstructionInjector,
+  injectGOS3Directives,
+  generateGOS3Metadata,
+} from "./GOS3SystemInstructionInjector";
 import {
   Bot,
   Sparkles,
@@ -236,6 +241,7 @@ export const AgentEditModal: React.FC<Props> = ({
 
   // 2. System Instructions & LLM
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [gos3Metadata, setGos3Metadata] = useState<GOS3AgentMetadata | undefined>(undefined);
   const [provider, setProvider] = useState<ModelProviderId>("gemini");
   const [model, setModel] = useState("gemini-3.7-flash");
   const [temperature, setTemperature] = useState(0.7);
@@ -281,6 +287,7 @@ export const AgentEditModal: React.FC<Props> = ({
 
       // System instructions
       setSystemPrompt(agent.systemPrompt || "");
+      setGos3Metadata(agent.gos3Metadata);
       setProvider(agent.provider || "gemini");
       setModel(agent.model || "gemini-3.7-flash");
       setTemperature(agent.temperature ?? 0.7);
@@ -389,6 +396,14 @@ export const AgentEditModal: React.FC<Props> = ({
     try {
       setSaving(true);
 
+      const finalGos3Metadata =
+        gos3Metadata ||
+        generateGOS3Metadata({
+          agentName: name.trim(),
+          agentHandle: handle.trim().replace(/^@/, ""),
+          agentRole: agent.humanPersona?.academicField || "Especialista Técnico Autônomo",
+        });
+
       const payload: Partial<UserAccount> = {
         name: name.trim(),
         handle: handle.trim().replace(/^@/, ""),
@@ -400,6 +415,7 @@ export const AgentEditModal: React.FC<Props> = ({
         model,
         temperature,
         systemPrompt: systemPrompt.trim(),
+        gos3Metadata: finalGos3Metadata,
         tools: selectedTools,
         humanPersona: {
           isHumanized: true,
@@ -789,18 +805,29 @@ export const AgentEditModal: React.FC<Props> = ({
             {/* TAB 2: SYSTEM INSTRUCTIONS & LLM CONFIG */}
             {activeTab === "instructions" && (
               <div className="space-y-5 animate-in fade-in">
+                {/* GOS3 System Instruction Injector */}
+                <GOS3SystemInstructionInjector
+                  systemPrompt={systemPrompt}
+                  onChangePrompt={setSystemPrompt}
+                  agentName={name || agent.name}
+                  agentHandle={handle || agent.handle}
+                  agentRole={agent.humanPersona?.academicField || "Especialista Autônomo GOS3"}
+                  onMetadataChange={setGos3Metadata}
+                  autoInjectOnMount={false}
+                />
+
                 {/* System Prompt */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-semibold text-neutral-300">
-                      System Instruction (Prompt de Sistema):
+                      System Instruction Completo (Prompt de Sistema):
                     </label>
                     <span className="text-[10px] text-neutral-500 font-mono">
                       {systemPrompt.length} caracteres
                     </span>
                   </div>
                   <textarea
-                    rows={6}
+                    rows={7}
                     value={systemPrompt}
                     onChange={(e) => setSystemPrompt(e.target.value)}
                     placeholder="Defina a personalidade, metodologia de raciocínio, premissas éticas e regras de resposta do agente..."

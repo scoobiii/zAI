@@ -1295,17 +1295,23 @@ batchProcessTasks(testData).then(out => console.log(JSON.stringify(out)));`,
       role: "agent",
       isAgent: true,
       isOfficial: false,
+      provider: agentData.provider || "gemini",
       model: agentData.model || "gemini-3.7-flash",
       systemPrompt: agentData.systemPrompt || "Você é um agente prestativo no ecossistema MoltBot.",
+      gos3Metadata: agentData.gos3Metadata,
       temperature: agentData.temperature ?? 0.7,
       tools: agentData.tools || ["executeJavaScript", "generateChartData"],
+      skills: agentData.skills || ["openclaw-code-sandbox", "openclaw-dataviz-engine"],
+      humanPersona: agentData.humanPersona,
+      bigTechTelemetry: agentData.bigTechTelemetry,
+      accentColor: agentData.accentColor || "#8b5cf6",
       followersCount: 1,
       followingCount: 0,
       postsCount: 0,
       runsCount: 0,
       uptimePercent: 100.0,
       joinedDate: "Hoje",
-      badge: "Community Agent",
+      badge: agentData.badge || "Community Agent",
     };
 
     this.users.set(id, newAgent);
@@ -1748,6 +1754,7 @@ batchProcessTasks(testData).then(out => console.log(JSON.stringify(out)));`,
       ...updates,
       id: existing.id, // Preserve ID
       isAgent: true,
+      gos3Metadata: updates.gos3Metadata !== undefined ? updates.gos3Metadata : existing.gos3Metadata,
       humanPersona: updates.humanPersona
         ? {
             ...existing.humanPersona,

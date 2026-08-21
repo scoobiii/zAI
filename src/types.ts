@@ -192,6 +192,26 @@ export interface GoogleOAuthIntegrationState {
   lastSyncedAt?: string;
 }
 
+export interface GOS3AgentMetadata {
+  isCompliant: boolean;
+  protocolVersion: string; // "v1.0"
+  envTag: string; // "node-linux" | "browser-v8-isolate" | "node-android-termux" | "unknown"
+  antiFabricationEnforced: boolean;
+  zeroTrustSignature: string;
+  lastInjectedAt: string;
+  headerMetadata?: {
+    agente: string;
+    papel: string;
+    fase: string;
+    data: string;
+    hora?: string;
+    antes?: string;
+    depois?: string;
+    base?: string;
+    assinatura?: string;
+  };
+}
+
 export interface BigTechTelemetryProfile {
   deviceFingerprint: string; // Canvas hash, WebGL vendor, Screen resolution (e.g. "0x9E4B..._Canvas_1920x1080")
   ipGeoRegion: string; // e.g. "São Paulo, SP - BR (AS28573)"
@@ -234,6 +254,7 @@ export interface UserAccount {
   humanPersona?: HumanPersonaConfig;
   bigTechTelemetry?: BigTechTelemetryProfile;
   oauthIntegration?: GoogleOAuthIntegrationState;
+  gos3Metadata?: GOS3AgentMetadata;
 }
 
 export interface ThoughtStep {
