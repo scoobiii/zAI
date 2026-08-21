@@ -584,13 +584,85 @@ async function startServer() {
       const agent = storage.getUserById(req.params.id);
       if (!agent || !agent.isAgent) return res.status(404).json({ error: "Agent not found" });
 
-      const { prompt, threadHistory, mentions } = req.body;
-      const result = await AgentRunner.runAgent(agent, prompt || "Execute analysis and share findings", threadHistory, mentions);
+      const { prompt, threadHistory, mentions, skill, payload } = req.body ?? {};
+
+      const derivedPrompt =
+        prompt ||
+        payload?.prompt ||
+        payload?.command ||
+        payload?.code ||
+        (payload?.url ? `Fetch and analyze URL: ${payload.url}` : null) ||
+        (skill
+          ? `Execute skill "${skill}" with payload: ${JSON.stringify(payload ?? {})}`
+          : null) ||
+        "Execute analysis and share findings";
+
+      if (skill === "executeBash" && payload?.command) {
+        const { AgentSandbox } = await import("./src/server/sandbox");
+        const tool = await AgentSandbox.executeBash(String(payload.command));
+        const stdout = (tool as any)?.stdout ?? (tool as any)?.output ?? JSON.stringify(tool);
+        const { createHash } = await import("crypto");
+        return res.json({
+          content: typeof stdout === "string" ? stdout : JSON.stringify(stdout),
+          thoughtLog: {
+            model: "sandbox-direct",
+            provider: "openclaw",
+            promptUsed: derivedPrompt,
+            totalDurationMs: (tool as any)?.durationMs ?? (tool as any)?.executionTimeMs ?? 0,
+            steps: [{
+              id: `step-bash-${Date.now()}`,
+              title: "executeBash",
+              toolName: "executeBash",
+              inputArgs: { command: payload.command },
+              outputResult: tool,
+            }],
+          },
+          executed: true,
+          evidence_hash: createHash("sha256").update(String(stdout) + Date.now()).digest("hex"),
+        });
+      }
+
+      if (skill === "webFetchUrl" && payload?.url) {
+        const { AgentSandbox } = await import("./src/server/sandbox");
+        const tool = await AgentSandbox.webFetchUrl({ url: String(payload.url) });
+        const stdout =
+          (tool as any)?.stdout ??
+          (tool as any)?.markdown ??
+          (tool as any)?.output ??
+          JSON.stringify(tool);
+        const { createHash } = await import("crypto");
+        return res.json({
+          content: String(stdout).slice(0, 8000),
+          thoughtLog: {
+            model: "sandbox-direct",
+            provider: "openclaw",
+            promptUsed: derivedPrompt,
+            totalDurationMs: (tool as any)?.durationMs ?? 0,
+            steps: [{
+              id: `step-fetch-${Date.now()}`,
+              title: "webFetchUrl",
+              toolName: "webFetchUrl",
+              inputArgs: { url: payload.url },
+              outputResult: { preview: String(stdout).slice(0, 500) },
+            }],
+          },
+          executed: true,
+          evidence_hash: createHash("sha256").update(String(stdout) + Date.now()).digest("hex"),
+        });
+      }
+
+      const result = await AgentRunner.runAgent(
+        agent,
+        derivedPrompt,
+        threadHistory,
+        mentions
+      );
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
 
   // 5. Users & Real Auth Profiles
   app.get("/api/users", (_req, res) => {
