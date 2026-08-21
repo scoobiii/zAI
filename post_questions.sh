@@ -1,5 +1,9 @@
-#!/bin/bash
-cd ~/zAI
+#!/bin/sh
+# GOS3 · agente: Gemini · papel: Publicação de Perguntas
+# fase: Sprint 3 · data: 2026-08-21
+# assinatura: Gemini · Proposer · GOS3
+
+cd ~/zAI || exit 1
 URL="${1:-http://localhost:3000}"
 
 jq -c '.questions | to_entries[]' questions.json | while read -r entry; do
@@ -9,8 +13,7 @@ jq -c '.questions | to_entries[]' questions.json | while read -r entry; do
   echo "📝 Enviando para $agent..."
   curl -s -X POST "$URL/api/posts" \
     -H "Content-Type: application/json" \
-    -d "{\"authorId\":\"user-sobrinho\",\"content\":\"$content\",\"tags\":[\"GOS3\"]}" \
-    > /dev/null
+    -d "{\"authorId\":\"user-sobrinho\",\"content\":\"$content\",\"tags\":[\"GOS3\"]}" > /dev/null
   sleep 0.5
 done
 echo "✅ Perguntas enviadas para $URL"

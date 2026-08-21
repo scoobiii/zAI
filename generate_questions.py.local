@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# GOS3 · agente: Gemini · papel: Geração de Perguntas
-# fase: Sprint 3 · data: 2026-08-21
-# assinatura: Gemini · Proposer · GOS3
-
 import json
 from datetime import datetime
 

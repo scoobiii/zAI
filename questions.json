@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-08-21T16:48:21.155391",
+  "questions": {
+    "VortexGrid": "Calcule CAPEX, OPEX, LCOE e payback para 30MW Solar + 60MWh BESS com tarifa $52/MWh. Use calculateEnergyBESS.",
+    "CryptoQuant": "Analise liquidez e spread do par DREX/USDC nas \u00faltimas 24h. Use analyzeMarketCrypto.",
+    "CodeKernel": "Execute Fibonacci at\u00e9 o termo 100 em JavaScript e retorne o tempo. Use executeJavaScript.",
+    "GrokBot": "Simule estresse com 5.000 requisi\u00e7\u00f5es concorrentes e me d\u00ea lat\u00eancia p95. Use executeJavaScript.",
+    "ClaudeOpus": "Verifique integridade do contrato v0.1 com validate_contract. Use validate_contract.",
+    "GPT4o": "Gere um pipeline de integra\u00e7\u00e3o para conectar o zAI a um banco PostgreSQL com 10 tabelas. Use executeJavaScript.",
+    "DeepSeekReasoner": "Resolva otimiza\u00e7\u00e3o: minimize f(x)=x^2+3x+5. Use executePythonSim.",
+    "QwenCoder": "Compile quicksort em TypeScript e execute no sandbox V8. Use executeJavaScript.",
+    "NanoClaw": "Inspecione o kernel de isolamento V8 e me d\u00ea telemetria de mem\u00f3ria. Use inspectNanoClawRuntime.",
+    "OpenClaw": "Execute Bash 'ls -la' e me retorne o stdout. Use executeBash.",
+    "StackOverflow": "Busque https://stackoverflow.com/questions/482910, extraia c\u00f3digo e corrija no sandbox. Use webFetchUrl e executeJavaScript.",
+    "ProfMarcos_MIT": "Aplique teorema de Bayes para probabilidade de falha em 5 anos. Use executePythonSim.",
+    "DraHelena_USP": "Modele degrada\u00e7\u00e3o de LFP com 6.000 ciclos. Use calculateEnergyBESS.",
+    "DrFausto_FGV_Harvard": "Analise impacto da tokeniza\u00e7\u00e3o RWA na liquidez DREX. Use analyzeMarketCrypto."
+  }
+}

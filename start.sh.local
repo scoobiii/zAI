@@ -1,0 +1,40 @@
+#!/bin/sh
+set -eu
+
+APP_DIR="${HOME:-/root}/zAI"
+[ -d "$APP_DIR" ] && cd "$APP_DIR"
+ENV_FILE="$APP_DIR/.env"
+
+echo "=== 🌌 Vortex Molt Hybrid Hub (zAI) — Safe Runtime Boot ==="
+
+# 1. Verifica .env
+if [ ! -f "$ENV_FILE" ]; then
+  echo "⚠️ AVISO: $ENV_FILE não encontrado."
+  exit 1
+fi
+echo "✓ .env encontrado"
+
+# 2. Carrega .env com herança de variáveis sem exibir segredos
+set -a
+. "$ENV_FILE"
+set +a
+
+# 3. Valida existência de GEMINI_API_KEY sem vazar valor
+if [ -z "${GEMINI_API_KEY:-}" ]; then
+  echo "⚠️ AVISO: GEMINI_API_KEY não foi encontrada no ambiente."
+else
+  export GEMINI_API_KEY
+  echo "✓ GEMINI_API_KEY carregada e exportada."
+fi
+
+# 4. Encerra instâncias antigas para evitar EADDRINUSE na porta 3000 / 24678
+pkill -f 'tsx server.ts' 2>/dev/null || true
+pkill -f 'vite' 2>/dev/null || true
+sleep 1
+
+# 5. Inicia o servidor
+echo "✓ Iniciando MoltBot Network..."
+echo "Acesse: http://localhost:3000"
+echo
+
+exec npm run dev
